@@ -19,12 +19,20 @@
 #ifndef SANTA__COMMON__LOGGING_H
 #define SANTA__COMMON__LOGGING_H
 
+#import <os/base.h>
 #import <os/log.h>
 
-#define LOG_WITH_TYPE(type, fmt, ...) os_log_with_type(OS_LOG_DEFAULT, type, fmt, ##__VA_ARGS__)
-#define LOGD(fmt, ...) LOG_WITH_TYPE(OS_LOG_TYPE_DEBUG, "D " fmt, ##__VA_ARGS__)
-#define LOGI(fmt, ...) LOG_WITH_TYPE(OS_LOG_TYPE_INFO, "I " fmt, ##__VA_ARGS__)
-#define LOGW(fmt, ...) LOG_WITH_TYPE(OS_LOG_TYPE_DEFAULT, "W " fmt, ##__VA_ARGS__)
-#define LOGE(fmt, ...) LOG_WITH_TYPE(OS_LOG_TYPE_ERROR, "E " fmt, ##__VA_ARGS__)
+__BEGIN_DECLS
+
+void logMessage(os_log_type_t logType, FILE *destination, const char *format, ...)
+  __attribute__((format(os_log, 3, 4)));
+
+#define LOG_WITH_TYPE(type, dest, fmt, ...) logMessage(OS_LOG_DEFAULT, dest, type, fmt, ##__VA_ARGS__)
+#define LOGD(fmt, ...) LOG_WITH_TYPE(OS_LOG_TYPE_DEBUG, stdout, "D " fmt, ##__VA_ARGS__)
+#define LOGI(fmt, ...) LOG_WITH_TYPE(OS_LOG_TYPE_INFO, stdout, "I " fmt, ##__VA_ARGS__)
+#define LOGW(fmt, ...) LOG_WITH_TYPE(OS_LOG_TYPE_DEFAULT, stderr, "W " fmt, ##__VA_ARGS__)
+#define LOGE(fmt, ...) LOG_WITH_TYPE(OS_LOG_TYPE_ERROR, stderr, "E " fmt, ##__VA_ARGS__)
+
+__END_DECLS
 
 #endif  // SANTA__COMMON__LOGGING_H

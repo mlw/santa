@@ -65,8 +65,7 @@ SNTStoredEvent *createTestBundleStoredEvent(NSBundle *bundle, NSString *fakeBund
 id getEventForMessage(SNTPBSantaMessage *santaMsg, SNTPBSantaMessage_Message_OneOfCase expectedCase,
                       NSString *propertyName, Class expectedClass) {
   if (santaMsg.messageOneOfCase != expectedCase) {
-    LOGE("Unexpected message type. Had: %d, Expected: %d", santaMsg.messageOneOfCase,
-         expectedCase);
+    LOGE("Unexpected message type. Had: %d, Expected: %d", santaMsg.messageOneOfCase, expectedCase);
     return nil;
   }
 
