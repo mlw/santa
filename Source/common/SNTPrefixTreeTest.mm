@@ -12,6 +12,7 @@
 ///    See the License for the specific language governing permissions and
 ///    limitations under the License.
 
+#include <uuid/uuid.h>
 #import <XCTest/XCTest.h>
 
 #include "Source/common/SNTPrefixTree.h"
@@ -68,6 +69,92 @@
   });
 
   stop = YES;
+}
+
+// Test Add and Reset operations happening concurrently
+- (void)testAddAndReset {
+  auto tree = new SNTPrefixTree();
+
+  dispatch_queue_t qAdd = dispatch_queue_create(NULL, NULL);
+  dispatch_queue_t qReset = dispatch_queue_create(NULL, NULL);
+
+  // Let the Add operation go faster than the reset operation to make
+  // sure the tree has content
+  // useconds_t sleepAdd = 1;
+  useconds_t sleepReset = 300;
+
+  // Cap Reset operations relative to the amount of time slept so that
+  // they finish about the same time...
+  // uint32_t addOps = 50000;
+  // uint32_t resetOps = addOps * (sleepAdd / (double)sleepReset);
+  uint32_t resetOps = 5000;
+
+  // printf("Add ops: %u, reset ops: %u\n", addOps, resetOps);
+
+  uint32_t maxAttempts = 10;
+  dispatch_group_t group = dispatch_group_create();
+  dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+
+  for (uint32_t attempts = 0; attempts < maxAttempts; attempts++) {
+    dispatch_group_enter(group);
+    dispatch_async(qAdd, ^{
+      // char prefix[7] = "/A/A/A";
+      uuid_t uuid;
+      uuid_string_t uuidStr;
+
+      // for (uint32_t i = 0; i < addOps; i++) {
+      //   // [[NSProcessInfo processInfo] globallyUniqueString];
+      //   // prefix[1] = ((i + 0) %  4) + 'A';
+      //   // prefix[3] = ((i + 1) % 26) + 'A';
+      //   // prefix[5] = ((i + 2) % 26) + 'A';
+
+      //   // tree->AddPrefix(prefix);
+
+      //   // tree->AddPrefix([[[NSProcessInfo processInfo] globallyUniqueString] UTF8String]);
+
+      //   uuid_generate_random(uuid);
+      //   uuid_unparse_lower(uuid, uuidStr);
+      //   tree->AddPrefix(uuidStr);
+
+      //   // usleep(sleepAdd);
+      // }
+
+      uint64_t addCount = 0;
+
+      while (dispatch_semaphore_wait(sema, DISPATCH_TIME_NOW)) {
+        uuid_generate_random(uuid);
+        uuid_unparse_lower(uuid, uuidStr);
+        uuidStr[10] = '\0'; // trunacate to spend less time in AddPrefix with lock held
+        tree->AddPrefix(uuidStr);
+        addCount++;
+        if (addCount % 100 == 0) {
+          // printf("Added %llu\n", addCount);
+        }
+      }
+
+      dispatch_group_leave(group);
+    });
+
+    dispatch_group_enter(group);
+    dispatch_async(qReset, ^{
+      for (uint32_t i = 0; i < resetOps; i++) {
+        tree->Reset();
+        usleep(sleepReset);
+        // printf("Reset\n");
+      }
+
+      dispatch_semaphore_signal(sema);
+      dispatch_group_leave(group);
+    });
+
+    if (dispatch_group_wait(group, dispatch_time(DISPATCH_TIME_NOW, 10 * NSEC_PER_SEC))) {
+      XCTFail("Times out waiting for Add/Reset operations to complete.");
+      break;
+    }
+  }
+
+  // If we get here, the test didn't crash and all was successful
+  XCTAssertTrue(YES);
 }
 
 @end
