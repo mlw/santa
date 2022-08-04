@@ -1,4 +1,4 @@
-load("//:helper.bzl", "santa_unit_test")
+load("//:helper.bzl", "santa_unit_test", "santa_gtest", "santa_unit_gtest")
 load("@rules_proto_grpc//objc:defs.bzl", "objc_proto_library")
 
 package(
@@ -303,3 +303,76 @@ test_suite(
     ],
     visibility = ["//:santa_package_group"],
 )
+
+# santa_gtest(
+#   name = "TestTestTest",
+#   srcs = ["TestTest.mm"],
+#   deps = [
+#       # ":AuthResultCache",
+#       # "//Source/common/MockFunction",
+#       "@com_google_googletest//:gtest_main",
+#       # "@OCMock",
+#   ],
+# )
+
+objc_library(
+    name = "TestTest",
+    srcs = ["TestTest.mm"],
+    hdrs = ["TestTest.h"],
+
+    deps = [
+        "//Source/santad:AuthResultCache",
+        "//Source/santad:EndpointSecurityAPI",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+  name = "TestTestTest",
+  srcs = ["TestRunner.cc", "TestTest.h"],
+  # hdrs = ["TestTest.mm"],
+  deps = [
+      # ":AuthResultCache",
+      # "//Source/common/MockFunction",
+      ":TestTest",
+      # "//Source/santad:AuthResultCache",
+      # "@com_google_googletest//:gtest_main",
+      # "@OCMock",
+  ],
+)
+
+# santa_unit_gtest(
+#   name = "TestUnitGTest",
+#   srcs = ["TestTest.mm"],
+#   deps = [
+#       # ":AuthResultCache",
+#       # "//Source/common/MockFunction",
+#       # "@com_google_googletest//:gtest_main",
+#       # "@OCMock",
+#   ],
+# )
+
+santa_unit_gtest(
+  name = "TestTestObjCpp",
+  hdrs = "TestTest.h",
+  srcs = ["TestTest.mm"],
+  deps = [
+      # ":AuthResultCache",
+      # "//Source/common/MockFunction",
+      "//Source/santad:AuthResultCache",
+      "@com_google_googletest//:gtest",
+      # "@com_google_googletest//:gtest_main",
+      # "@OCMock",
+  ],
+)
+
+# santa_gtest(
+#   name = "TestTestFoo",
+#   srcs = ["TestTestFoo.cc"],
+#   deps = [
+#       # ":AuthResultCache",
+#       # "//Source/common/MockFunction",
+#       "@com_google_googletest//:gtest_main",
+#       # "@OCMock",
+#   ],
+# )

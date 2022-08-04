@@ -14,6 +14,20 @@ http_archive(
 )
 
 http_archive(
+  name = "com_google_googletest",
+  urls = ["https://github.com/google/googletest/archive/58d77fa8070e8cec2dc1ed015d66b454c8d78850.zip"],
+  strip_prefix = "googletest-58d77fa8070e8cec2dc1ed015d66b454c8d78850",
+  sha256 = "ab78fa3f912d44d38b785ec011a25f26512aaedc5291f51f3807c592b506d33a",
+)
+
+# git_repository(
+#     name = "com_google_googletest",
+#     commit = "58d77fa8070e8cec2dc1ed015d66b454c8d78850",  # tag = release-1.12.1
+#     remote = "https://github.com/google/googletest.git",
+#     shallow_since = "1656350095 -0400",
+# )
+
+http_archive(
     name = "rules_proto_grpc",
     sha256 = "28724736b7ff49a48cb4b2b8cfa373f89edfcb9e8e492a8d5ab60aa3459314c8",
     strip_prefix = "rules_proto_grpc-4.0.1",

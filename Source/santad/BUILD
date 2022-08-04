@@ -1,5 +1,5 @@
 load("@build_bazel_rules_apple//apple:macos.bzl", "macos_bundle")
-load("//:helper.bzl", "santa_unit_test")
+load("//:helper.bzl", "santa_unit_test", "santa_gtest")
 
 package(
     default_visibility = ["//:santa_package_group"],
@@ -984,17 +984,53 @@ santa_unit_test(
     ],
 )
 
+# santa_unit_test(
+#   name = "AuthResultCacheTest",
+#   size = "small",
+#   srcs = ["EventProviders/AuthResultCacheTest.mm"],
+#   deps = [
+#       ":AuthResultCache",
+#       # "//Source/common/MockFunction",
+#       "@com_google_googletest//:gtest_main",
+#       "@OCMock",
+#   ],
+# )
+
+# santa_gtest(
+#   name = "AuthResultCacheTest",
+#   size = "small",
+#   srcs = ["EventProviders/AuthResultCacheTest.mm"],
+#   deps = [
+#       ":AuthResultCache",
+#       # "//Source/common/MockFunction",
+#       "@com_google_googletest//:gtest_main",
+#       "@OCMock",
+#   ],
+# )
+
+# santa_gtest(
+#   name = "TestTestTest",
+#   srcs = ["//Source/common/TestTest.mm"],
+#   deps = [
+#       # ":AuthResultCache",
+#       # "//Source/common/MockFunction",
+#       "@com_google_googletest//:gtest_main",
+#       # "@OCMock",
+#   ],
+# )
+
 test_suite(
     name = "unit_tests",
     tests = [
-        ":SNTApplicationCoreMetricsTest",
-        ":SNTApplicationTest",
-        ":SNTDeviceManagerTest",
-        ":SNTEndpointSecurityManagerTest",
-        ":SNTEventTableTest",
-        ":SNTExecutionControllerTest",
-        ":SNTProtobufEventLogTest",
-        ":SNTRuleTableTest",
+        ":AuthResultCacheTest",
+        # ":SNTApplicationCoreMetricsTest",
+        # ":SNTApplicationTest",
+        # ":SNTDeviceManagerTest",
+        # ":SNTEndpointSecurityManagerTest",
+        # ":SNTEventTableTest",
+        # ":SNTExecutionControllerTest",
+        # ":SNTProtobufEventLogTest",
+        # ":SNTRuleTableTest",
     ],
     visibility = ["//:santa_package_group"],
 )
