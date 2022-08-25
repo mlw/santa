@@ -17,7 +17,7 @@
 @end
 
 @implementation DerivedFake {
-  std::map<int, int> unused;
+  // std::map<int, int> unused;
 }
 
 - (instancetype)initWithObj:(std::shared_ptr<int>)obj {

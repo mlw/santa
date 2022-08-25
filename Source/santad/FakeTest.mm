@@ -26,7 +26,7 @@
 
   id mockFake = OCMPartialMock(fake);
 
-  [mockFake doAThing];
+  [fake doAThing];
 
   [mockFake stopMocking];
 }
