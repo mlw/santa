@@ -51,5 +51,6 @@ def santa_unit_test(
         deps = [":%s_lib" % name],
         size = size,
         data = data,
+        env = {"DYLD_INSERT_LIBRARIES": "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/13.1.6/lib/darwin/libclang_rt.asan_osx_dynamic.dylib"},
         visibility = ["//:__subpackages__"],
     )
