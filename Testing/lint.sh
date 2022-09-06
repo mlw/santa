@@ -4,6 +4,7 @@ function main() {
     GIT_ROOT=$(git rev-parse --show-toplevel)
     err=0
 
+    clang-format --version
     clang-format $GIT_ROOT/Source/common/SNTStrengthify.h > $GIT_ROOT/temp.h
     diff $GIT_ROOT/Source/common/SNTStrengthify.h $GIT_ROOT/temp.h
 
