@@ -31,12 +31,14 @@ class Message {
   ~Message();
 
   Message(Message&& other);
+  Message(Message const&& other) = delete;
   // Note: Safe to implement this, just not currently needed so left deleted.
   Message& operator=(Message&& rhs) = delete;
 
   // In macOS 10.15, es_retain_message/es_release_message were unsupported
   // and required a full copy, which impacts performance if done too much...
-  Message(const Message& other);
+  Message(const Message& other) = delete;
+  // Message(const Message& other);
   Message& operator=(const Message& other) = delete;
 
   // Operators to access underlying es_message_t

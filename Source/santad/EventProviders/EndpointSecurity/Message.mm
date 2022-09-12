@@ -23,6 +23,7 @@ namespace santa::santad::event_providers::endpoint_security {
 
 Message::Message(std::shared_ptr<EndpointSecurityAPI> esapi, const es_message_t *es_msg)
     : esapi_(esapi) {
+  printf("\n\n Message CTOR - RetainMessage()\n");
   es_msg_ = esapi_->RetainMessage(es_msg);
 }
 
@@ -38,11 +39,13 @@ Message::Message(Message &&other) {
   other.es_msg_ = nullptr;
 }
 
-Message::Message(const Message &other) {
-  esapi_ = other.esapi_;
-  es_msg_ = other.es_msg_;
-  esapi_->RetainMessage(es_msg_);
-}
+// Message::Message(const Message &other) {
+//   esapi_ = other.esapi_;
+//   es_msg_ = other.es_msg_;
+//   printf("\n\n Message COPY - RetainMessage()\n");
+//   esapi_->RetainMessage(es_msg_);
+//   // abort();
+// }
 
 std::string Message::ParentProcessName() const {
   if (parent_pname_.length() == 0) {
