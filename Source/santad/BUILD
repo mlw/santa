@@ -50,6 +50,7 @@ santa_unit_test(
     deps = [
         ":WatchItems",
         "//Source/common:PrefixTree",
+        "//Source/common:TestUtils",
         "@OCMock",
     ],
 )
@@ -1198,6 +1199,7 @@ test_suite(
         ":SNTExecutionControllerTest",
         ":SNTRuleTableTest",
         ":SantadTest",
+        ":WatchItemsTest",
         "//Source/santad/Logs/EndpointSecurity/Writers/FSSpool:fsspool_test",
     ],
     visibility = ["//:santa_package_group"],
