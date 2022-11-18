@@ -13,7 +13,9 @@
 /// limitations under the License.
 
 #include "Source/santad/DataLayer/WatchItems.h"
+
 #include <cstddef>
+#include <optional>
 #include <set>
 #include <utility>
 
@@ -27,7 +29,6 @@
 // we undef `__BLOCKS__` so that the `gl_errblk` type isn't added to
 // the union.
 #pragma push_macro("__BLOCKS__")
-#define REDEF_BLOCKS
 #undef __BLOCKS__
 #include <glob.h>
 #pragma pop_macro("__BLOCKS__")
@@ -300,6 +301,10 @@ void WatchItems::BeginPeriodicTask() {
 }
 
 std::optional<std::shared_ptr<WatchItemPolicy>> WatchItems::FindPolicyForPath(const char *input) {
+  if (!input) {
+    return std::nullopt;
+  }
+
   absl::ReaderMutexLock lock(&lock_);
   return watch_items_->LookupLongestMatchingPrefix(input);
 }
