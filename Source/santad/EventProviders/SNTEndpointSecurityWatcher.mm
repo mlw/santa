@@ -29,8 +29,8 @@
 #include <type_traits>
 #include <variant>
 
-#include "Source/common/SNTCommon.h"
 #include "Source/common/SantaCache.h"
+#include "Source/common/SantaVnodeHash.h"
 #include "Source/common/Unit.h"
 #include "Source/santad/DataLayer/WatchItems.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Message.h"
@@ -104,11 +104,6 @@ PathTargets GetPathTargets(const Message &msg) {
                   format:@"Watcher client does not handle event: %d", msg->event_type];
       exit(EXIT_FAILURE);
   }
-}
-
-template <>
-uint64_t SantaCacheHasher<SantaVnode>(SantaVnode const &t) {
-  return (SantaCacheHasher<uint64_t>(t.fsid) << 1) ^ SantaCacheHasher<uint64_t>(t.fileid);
 }
 
 @interface SNTEndpointSecurityWatcher ()

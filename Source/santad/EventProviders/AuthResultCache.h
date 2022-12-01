@@ -52,13 +52,8 @@ class AuthResultCache {
 
   virtual bool AddToCache(const es_file_t *es_file, SNTAction decision);
   virtual void RemoveFromCache(const es_file_t *es_file);
-<<<<<<< HEAD
   virtual SNTAction CheckCache(const es_file_t *es_file);
   virtual SNTAction CheckCache(SantaVnode vnode_id);
-=======
-  virtual santa_action_t CheckCache(const es_file_t *es_file);
-  virtual santa_action_t CheckCache(SantaVnode vnode_id);
->>>>>>> 85058ec (Rename santa_vnode_id_t to SantaVnode (#943))
 
   virtual void FlushCache(FlushCacheMode mode);
 

@@ -87,11 +87,7 @@ double watchdogRAMPeak = 0;
   reply(YES);
 }
 
-<<<<<<< HEAD
 - (void)checkCacheForVnodeID:(SantaVnode)vnodeID withReply:(void (^)(SNTAction))reply {
-=======
-- (void)checkCacheForVnodeID:(SantaVnode)vnodeID withReply:(void (^)(santa_action_t))reply {
->>>>>>> 85058ec (Rename santa_vnode_id_t to SantaVnode (#943))
   reply(self->_authResultCache->CheckCache(vnodeID));
 }
 
