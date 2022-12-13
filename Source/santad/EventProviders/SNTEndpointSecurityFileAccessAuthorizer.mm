@@ -42,6 +42,7 @@ using santa::santad::EventDisposition;
 using santa::santad::data_layer::WatchItemPolicy;
 using santa::santad::data_layer::WatchItems;
 using santa::santad::event_providers::endpoint_security::EndpointSecurityAPI;
+using santa::santad::event_providers::endpoint_security::EnrichedFileAccess;
 using santa::santad::event_providers::endpoint_security::Enricher;
 using santa::santad::event_providers::endpoint_security::EnrichOptions;
 using santa::santad::event_providers::endpoint_security::Message;
@@ -336,13 +337,19 @@ std::pair<std::optional<std::string>, std::optional<std::string>> GetPathTargets
       std::string policyName = optionalPolicy.value()->name;
       std::string policyVersion = self->_watchItems->PolicyVersion();
 
-      [self asynchronouslyProcess:msg
-                          handler:^(const Message &esMsg) {
-                            self->_logger->LogFileAccess(
-                              policyVersion, policyName, esMsg,
-                              self->_enricher->Enrich(*msg->process, EnrichOptions::kLocalOnly),
-                              target, policyDecision);
-                          }];
+      [self
+        asynchronouslyProcess:msg
+                      handler:^(const Message &esMsg) {
+                        EnrichedFileAccess enrichedFileAccess(
+                          esMsg, self->_enricher->Enrich(*msg->process, EnrichOptions::kLocalOnly),
+                          self->_watchItems->PolicyVersion(), optionalPolicy.value()->name, target,
+                          policyDecision);
+
+                        self->_logger->LogFileAccess(
+                          policyVersion, policyName, esMsg,
+                          self->_enricher->Enrich(*msg->process, EnrichOptions::kLocalOnly), target,
+                          policyDecision);
+                      }];
 
     } else {
       LOGE(@"Unexpectedly missing policy: Unable to log file access event: %s -> %s",

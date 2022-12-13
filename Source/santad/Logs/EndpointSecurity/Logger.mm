@@ -98,6 +98,11 @@ void Logger::LogDiskDisappeared(NSDictionary *props) {
   writer_->Write(serializer_->SerializeDiskDisappeared(props));
 }
 
+void Logger::LogFileAccess2(
+  const santa::santad::event_providers::endpoint_security::EnrichedFileAccess &access) {
+  writer_->Write(serializer_->SerializeFileAccess2(access));
+}
+
 void Logger::LogFileAccess(
   const std::string &policy_version, const std::string &policy_name,
   const santa::santad::event_providers::endpoint_security::Message &msg,

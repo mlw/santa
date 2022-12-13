@@ -408,6 +408,24 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedUnlink &msg) {
   return FinalizeString(str);
 }
 
+std::vector<uint8_t> BasicString::SerializeFileAccess2(
+  const santa::santad::event_providers::endpoint_security::EnrichedFileAccess &file_access) {
+  std::string str = CreateDefaultString();
+
+  str.append("action=FILE_ACCESS|path=");
+  str.append(file_access.target());
+  str.append("|access_type=");
+  str.append(GetAccessTypeString(file_access.es_msg().event_type));
+  str.append("|decision=");
+  str.append(GetFileAccessPolicyDecisionString(file_access.policy_decision()));
+
+  AppendProcess(str, file_access.es_msg().process);
+  AppendUserGroup(str, file_access.es_msg().process->audit_token,
+                  file_access.instigator().real_user(), file_access.instigator().real_group());
+
+  return FinalizeString(str);
+}
+
 std::vector<uint8_t> BasicString::SerializeFileAccess(const std::string &policy_version,
                                                       const std::string &policy_name,
                                                       const Message &msg,

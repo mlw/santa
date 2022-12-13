@@ -63,6 +63,11 @@ std::vector<uint8_t> Empty::SerializeMessage(const EnrichedUnlink &msg) {
   return {};
 }
 
+std::vector<uint8_t> Empty::SerializeFileAccess2(
+  const santa::santad::event_providers::endpoint_security::EnrichedFileAccess &file_access) {
+  return {};
+}
+
 std::vector<uint8_t> Empty::SerializeFileAccess(const std::string &policy_version,
                                                 const std::string &policy_name, const Message &msg,
                                                 const EnrichedProcess &enriched_process,

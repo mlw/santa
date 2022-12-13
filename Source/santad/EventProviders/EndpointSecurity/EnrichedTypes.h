@@ -25,6 +25,7 @@
 #include <string>
 #include <variant>
 
+#include "Source/common/SNTCommonEnums.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Message.h"
 
 namespace santa::santad::event_providers::endpoint_security {
@@ -319,6 +320,38 @@ class EnrichedMessage {
 
  private:
   EnrichedType msg_;
+};
+
+class EnrichedFileAccess : public EnrichedEventType {
+ public:
+  EnrichedFileAccess(Message es_msg, EnrichedProcess &&instigator,
+                     std::string policy_version, std::string policy_name,
+                     std::string target,
+                     FileAccessPolicyDecision policy_decision)
+      : EnrichedEventType(std::move(es_msg), std::move(instigator)),
+        policy_version_(std::move(policy_version)),
+        policy_name_(std::move(policy_name)),
+        target_(std::move(target)),
+        policy_decision_(policy_decision) {}
+
+  EnrichedFileAccess(EnrichedFileAccess &&other)
+      : EnrichedEventType(std::move(other)),
+        policy_version_(std::move(other.policy_version_)),
+        policy_name_(std::move(other.policy_name_)),
+        target_(std::move(other.target_)),
+        policy_decision_(other.policy_decision_) {}
+  EnrichedFileAccess(const EnrichedFileAccess &other) = delete;
+
+  std::string_view policy_version() const { return policy_version_; }
+  std::string_view policy_name() const { return policy_name_; }
+  std::string_view target() const { return target_; }
+  FileAccessPolicyDecision policy_decision() const { return policy_decision_; }
+
+ private:
+  std::string policy_version_;
+  std::string policy_name_;
+  std::string target_;
+  FileAccessPolicyDecision policy_decision_;
 };
 
 }  // namespace santa::santad::event_providers::endpoint_security

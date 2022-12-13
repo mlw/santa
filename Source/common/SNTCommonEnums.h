@@ -12,6 +12,9 @@
 ///    See the License for the specific language governing permissions and
 ///    limitations under the License.
 
+#ifndef SANTA__COMMON__SNTCOMMONENUMS_H
+#define SANTA__COMMON__SNTCOMMONENUMS_H
+
 #import <Foundation/Foundation.h>
 
 ///
@@ -149,3 +152,5 @@ static const char *kSantaDPath =
   "/Applications/Santa.app/Contents/Library/SystemExtensions/"
   "com.google.santa.daemon.systemextension/Contents/MacOS/com.google.santa.daemon";
 static const char *kSantaAppPath = "/Applications/Santa.app";
+
+#endif

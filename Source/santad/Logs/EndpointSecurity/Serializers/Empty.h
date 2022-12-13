@@ -45,6 +45,9 @@ class Empty : public Serializer {
   std::vector<uint8_t> SerializeMessage(
     const santa::santad::event_providers::endpoint_security::EnrichedUnlink &) override;
 
+  std::vector<uint8_t> SerializeFileAccess2(
+    const santa::santad::event_providers::endpoint_security::EnrichedFileAccess &) override;
+
   std::vector<uint8_t> SerializeFileAccess(
     const std::string &policy_version, const std::string &policy_name,
     const santa::santad::event_providers::endpoint_security::Message &msg,

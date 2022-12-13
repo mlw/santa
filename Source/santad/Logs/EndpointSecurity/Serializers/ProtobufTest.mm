@@ -577,9 +577,16 @@ void SerializeAndCheckNonESEvents(
       esMsg->event.open.file = &openFile;
     },
     ^std::vector<uint8_t>(std::shared_ptr<Serializer> serializer, const Message &msg) {
-      return serializer->SerializeFileAccess("policy_version", "policy_name", msg,
-                                             Enricher().Enrich(*msg->process), "target",
-                                             FileAccessPolicyDecision::kDenied);
+      santa::santad::event_providers::endpoint_security::EnrichedFileAccess enrichedFileAccess(
+        msg, Enricher().Enrich(*msg->process), "policy_version", "policy_name", "target", FileAccessPolicyDecision::kDenied
+      );
+      return serializer->SerializeFileAccess2(
+        santa::santad::event_providers::endpoint_security::EnrichedFileAccess(
+          msg, Enricher().Enrich(*msg->process), "policy_v1.0", "policy_name_test", "watched_file", FileAccessPolicyDecision::kDenied
+      ));
+      // return serializer->SerializeFileAccess2("policy_version", "policy_name", msg,
+      //                                        Enricher().Enrich(*msg->process), "target",
+      //                                        FileAccessPolicyDecision::kDenied);
     });
 }
 
