@@ -21,6 +21,9 @@ objc_library(
     name = "SNTRuleTable",
     srcs = ["DataLayer/SNTRuleTable.m"],
     hdrs = ["DataLayer/SNTRuleTable.h"],
+    sdk_dylibs = [
+        "EndpointSecurity",
+    ],
     deps = [
         ":SNTDatabaseTable",
         "//Source/common:Platform",
@@ -137,6 +140,22 @@ objc_library(
         "//Source/common:SNTCachedDecision",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTRule",
+    ],
+)
+
+objc_library(
+    name = "DecisionCache",
+    srcs = ["DecisionCache.mm"],
+    hdrs = ["DecisionCache.h"],
+    deps = [
+        ":SNTDatabaseController",
+        ":SNTRuleTable",
+        "//Source/common:SNTCachedDecision",
+        "//Source/common:SNTCommonEnums",
+        "//Source/common:SNTRule",
+        "//Source/common:SantaCache",
+        "//Source/common:SantaVnode",
+        "//Source/common:SantaVnodeHash",
     ],
 )
 
@@ -1079,6 +1098,20 @@ santa_unit_test(
         ":SNTDecisionCache",
         ":SNTRuleTable",
         "//Source/common:SNTCachedDecision",
+        "//Source/common:SNTCommonEnums",
+        "//Source/common:SNTRule",
+        "//Source/common:TestUtils",
+        "@OCMock",
+    ],
+)
+
+santa_unit_test(
+    name = "DecisionCacheTest",
+    srcs = ["DecisionCacheTest.mm"],
+    deps = [
+        ":DecisionCache",
+        ":SNTDatabaseController",
+        ":SNTRuleTable",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTRule",
         "//Source/common:TestUtils",
