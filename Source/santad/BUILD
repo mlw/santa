@@ -164,10 +164,10 @@ objc_library(
     srcs = ["SNTCompilerController.mm"],
     hdrs = ["SNTCompilerController.h"],
     deps = [
+        ":DecisionCache",
         ":EndpointSecurityLogger",
         ":EndpointSecurityMessage",
         ":SNTDatabaseController",
-        ":SNTDecisionCache",
         ":SNTRuleTable",
         "//Source/common:SNTCachedDecision",
         "//Source/common:SNTCommonEnums",
@@ -229,8 +229,8 @@ objc_library(
     srcs = ["SNTExecutionController.mm"],
     hdrs = ["SNTExecutionController.h"],
     deps = [
+        ":DecisionCache",
         ":EndpointSecurityMessage",
-        ":SNTDecisionCache",
         ":SNTEventTable",
         ":SNTNotificationQueue",
         ":SNTPolicyProcessor",
@@ -347,13 +347,13 @@ objc_library(
     srcs = ["EventProviders/SNTEndpointSecurityFileAccessAuthorizer.mm"],
     hdrs = ["EventProviders/SNTEndpointSecurityFileAccessAuthorizer.h"],
     deps = [
+        ":DecisionCache",
         ":EndpointSecurityAPI",
         ":EndpointSecurityEnrichedTypes",
         ":EndpointSecurityEnricher",
         ":EndpointSecurityLogger",
         ":EndpointSecurityMessage",
         ":Metrics",
-        ":SNTDecisionCache",
         ":SNTEndpointSecurityClient",
         ":SNTEndpointSecurityEventHandler",
         ":WatchItemPolicy",
@@ -425,9 +425,10 @@ objc_library(
     srcs = ["Logs/EndpointSecurity/Serializers/Serializer.mm"],
     hdrs = ["Logs/EndpointSecurity/Serializers/Serializer.h"],
     deps = [
+        ":DecisionCache",
         ":EndpointSecurityEnrichedTypes",
         ":EndpointSecurityMessage",
-        ":SNTDecisionCache",
+        "//Source/common:SNTCachedDecision",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTConfigurator",
     ],
@@ -443,7 +444,6 @@ objc_library(
     deps = [
         ":EndpointSecurityEnrichedTypes",
         ":EndpointSecurityMessage",
-        ":SNTDecisionCache",
         "//Source/common:SantaCache",
         "//Source/common:SantaVnode",
         "//Source/common:SantaVnodeHash",
@@ -456,6 +456,7 @@ objc_library(
     hdrs = ["Logs/EndpointSecurity/Serializers/Empty.h"],
     deps = [
         ":EndpointSecuritySerializer",
+        "//Source/common:SNTCachedDecision",
     ],
 )
 
@@ -476,11 +477,11 @@ objc_library(
     srcs = ["Logs/EndpointSecurity/Serializers/BasicString.mm"],
     hdrs = ["Logs/EndpointSecurity/Serializers/BasicString.h"],
     deps = [
+        ":DecisionCache",
         ":EndpointSecurityAPI",
         ":EndpointSecuritySanitizableString",
         ":EndpointSecuritySerializer",
         ":EndpointSecuritySerializerUtilities",
-        ":SNTDecisionCache",
         "//Source/common:SNTCachedDecision",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTLogging",
@@ -493,10 +494,10 @@ objc_library(
     srcs = ["Logs/EndpointSecurity/Serializers/Protobuf.mm"],
     hdrs = ["Logs/EndpointSecurity/Serializers/Protobuf.h"],
     deps = [
+        ":DecisionCache",
         ":EndpointSecurityAPI",
         ":EndpointSecuritySerializer",
         ":EndpointSecuritySerializerUtilities",
-        ":SNTDecisionCache",
         "//Source/common:SNTCachedDecision",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTLogging",
@@ -557,6 +558,7 @@ objc_library(
     srcs = ["Logs/EndpointSecurity/Logger.mm"],
     hdrs = ["Logs/EndpointSecurity/Logger.h"],
     deps = [
+        ":DecisionCache",
         ":EndpointSecurityAPI",
         ":EndpointSecurityEnrichedTypes",
         ":EndpointSecurityMessage",
@@ -654,13 +656,13 @@ objc_library(
     hdrs = ["Santad.h"],
     deps = [
         ":AuthResultCache",
+        ":DecisionCache",
         ":EndpointSecurityAPI",
         ":EndpointSecurityEnricher",
         ":EndpointSecurityLogger",
         ":Metrics",
         ":SNTCompilerController",
         ":SNTDaemonControlController",
-        ":SNTDecisionCache",
         ":SNTEndpointSecurityAuthorizer",
         ":SNTEndpointSecurityDeviceManager",
         ":SNTEndpointSecurityFileAccessAuthorizer",
@@ -688,6 +690,7 @@ objc_library(
     hdrs = ["SantadDeps.h"],
     deps = [
         ":AuthResultCache",
+        ":DecisionCache",
         ":EndpointSecurityAPI",
         ":EndpointSecurityEnricher",
         ":EndpointSecurityLogger",
@@ -1309,6 +1312,7 @@ test_suite(
     name = "unit_tests",
     tests = [
         ":AuthResultCacheTest",
+        ":DecisionCacheTest",
         ":EndpointSecurityClientTest",
         ":EndpointSecurityEnricherTest",
         ":EndpointSecurityLoggerTest",
@@ -1323,7 +1327,6 @@ test_suite(
         ":MetricsTest",
         ":SNTApplicationCoreMetricsTest",
         ":SNTCompilerControllerTest",
-        ":SNTDecisionCacheTest",
         ":SNTEndpointSecurityAuthorizerTest",
         ":SNTEndpointSecurityClientTest",
         ":SNTEndpointSecurityDeviceManagerTest",

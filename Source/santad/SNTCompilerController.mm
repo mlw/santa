@@ -28,7 +28,6 @@
 #import "Source/common/SNTRule.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
 #import "Source/santad/SNTDatabaseController.h"
-#import "Source/santad/SNTDecisionCache.h"
 
 using santa::santad::event_providers::endpoint_security::Message;
 using santa::santad::logs::endpoint_security::Logger;
@@ -41,7 +40,17 @@ static constexpr std::string_view kIgnoredCompilerProcessPathPrefix = "/dev/";
 }
 @end
 
-@implementation SNTCompilerController
+@implementation SNTCompilerController {
+  std::shared_ptr<santa::santad::DecisionCache> _decisionCache;
+}
+
+- (instancetype)initWithDecisionCache:(std::shared_ptr<santa::santad::DecisionCache>)decisionCache {
+  self = [super init];
+  if (self) {
+    _decisionCache = std::move(decisionCache);
+  }
+  return self;
+}
 
 - (BOOL)isCompiler:(const audit_token_t &)tok {
   pid_t pid = audit_token_to_pid(tok);
@@ -62,18 +71,18 @@ static constexpr std::string_view kIgnoredCompilerProcessPathPrefix = "/dev/";
   }
 }
 
-// Adds a fake cached decision to SNTDecisionCache for pending files. If the file
+// Adds a fake cached decision to the DecisionCache for pending files. If the file
 // is executed before we can create a transitive rule for it, then we can at
 // least log the pending decision info.
 - (void)saveFakeDecision:(const es_file_t *)esFile {
   SNTCachedDecision *cd = [[SNTCachedDecision alloc] initWithEndpointSecurityFile:esFile];
   cd.decision = SNTEventStateAllowPendingTransitive;
   cd.sha256 = @"pending";
-  [[SNTDecisionCache sharedCache] cacheDecision:cd];
+  self->_decisionCache->CacheDecision(cd);
 }
 
 - (void)removeFakeDecision:(const es_file_t *)esFile {
-  [[SNTDecisionCache sharedCache] forgetCachedDecisionForFile:esFile->stat];
+  self->_decisionCache->ForgetCachedDecisionForFile(esFile->stat);
 }
 
 - (BOOL)handleEvent:(const Message &)esMsg withLogger:(std::shared_ptr<Logger>)logger {

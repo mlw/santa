@@ -40,6 +40,7 @@
 #include "Source/santad/EventProviders/EndpointSecurity/EnrichedTypes.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Message.h"
 
+using santa::santad::DecisionCache;
 using santa::santad::EventDisposition;
 using santa::santad::data_layer::WatchItemPathType;
 using santa::santad::data_layer::WatchItemPolicy;
@@ -188,13 +189,13 @@ void PopulatePathTargets(const Message &msg, std::vector<PathTarget> &targets) {
 }
 
 @interface SNTEndpointSecurityFileAccessAuthorizer ()
-@property SNTDecisionCache *decisionCache;
 @property bool isSubscribed;
 @end
 
 @implementation SNTEndpointSecurityFileAccessAuthorizer {
   std::shared_ptr<Logger> _logger;
   std::shared_ptr<WatchItems> _watchItems;
+  std::shared_ptr<DecisionCache> _decisionCache;
   std::shared_ptr<Enricher> _enricher;
   SantaCache<SantaVnode, NSString *> _certHashCache;
 }
@@ -207,7 +208,8 @@ void PopulatePathTargets(const Message &msg, std::vector<PathTarget> &targets) {
      watchItems:(std::shared_ptr<WatchItems>)watchItems
        enricher:
          (std::shared_ptr<santa::santad::event_providers::endpoint_security::Enricher>)enricher
-  decisionCache:(SNTDecisionCache *)decisionCache {
+  decisionCache:(std::shared_ptr<DecisionCache>)decisionCache;
+{
   self = [super initWithESAPI:std::move(esApi)
                       metrics:std::move(metrics)
                     processor:santa::santad::Processor::kFileAccessAuthorizer];
@@ -216,7 +218,7 @@ void PopulatePathTargets(const Message &msg, std::vector<PathTarget> &targets) {
     _logger = std::move(logger);
     _enricher = std::move(enricher);
 
-    _decisionCache = decisionCache;
+    _decisionCache = std::move(decisionCache);
 
     [self establishClientOrDie];
 
@@ -236,7 +238,7 @@ void PopulatePathTargets(const Message &msg, std::vector<PathTarget> &targets) {
   NSString *result = self->_certHashCache.get(vnodeID);
   if (!result) {
     // If this wasn't already cached, try finding a cached SNTCachedDecision
-    SNTCachedDecision *cd = [self.decisionCache cachedDecisionForFile:esFile->stat];
+    SNTCachedDecision *cd = self->_decisionCache->CachedDecisionForFile(esFile->stat);
     if (cd) {
       // There was an existing cached decision, use its cert hash
       result = cd.certSHA256;

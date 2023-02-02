@@ -18,6 +18,8 @@
 #import <Foundation/Foundation.h>
 #include <sys/stat.h>
 
+#include <memory>
+
 #import "Source/common/SNTCachedDecision.h"
 #include "Source/common/SantaCache.h"
 #include "Source/common/SantaVnode.h"
@@ -26,6 +28,9 @@ namespace santa::santad {
 
 class DecisionCache {
  public:
+  // Factory
+  static std::shared_ptr<DecisionCache> Create();
+
   DecisionCache();
 
   void CacheDecision(SNTCachedDecision *cd);

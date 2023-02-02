@@ -21,6 +21,8 @@
 #include <sstream>
 #include <vector>
 
+#import "Source/common/SNTCachedDecision.h"
+#include "Source/santad/DecisionCache.h"
 #include "Source/santad/EventProviders/EndpointSecurity/EndpointSecurityAPI.h"
 #include "Source/santad/Logs/EndpointSecurity/Serializers/Serializer.h"
 
@@ -30,18 +32,19 @@ class BasicString : public Serializer {
  public:
   static std::shared_ptr<BasicString> Create(
     std::shared_ptr<santa::santad::event_providers::endpoint_security::EndpointSecurityAPI> esapi,
-    bool prefix_time_name = true);
+    std::shared_ptr<santa::santad::DecisionCache> decision_cache, bool prefix_time_name = true);
 
   BasicString(
     std::shared_ptr<santa::santad::event_providers::endpoint_security::EndpointSecurityAPI> esapi,
-    bool prefix_time_name);
+    std::shared_ptr<santa::santad::DecisionCache> decision_cache, bool prefix_time_name);
 
   std::vector<uint8_t> SerializeMessage(
     const santa::santad::event_providers::endpoint_security::EnrichedClose &) override;
   std::vector<uint8_t> SerializeMessage(
     const santa::santad::event_providers::endpoint_security::EnrichedExchange &) override;
   std::vector<uint8_t> SerializeMessage(
-    const santa::santad::event_providers::endpoint_security::EnrichedExec &) override;
+    const santa::santad::event_providers::endpoint_security::EnrichedExec &,
+    SNTCachedDecision *) override;
   std::vector<uint8_t> SerializeMessage(
     const santa::santad::event_providers::endpoint_security::EnrichedExit &) override;
   std::vector<uint8_t> SerializeMessage(

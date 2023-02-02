@@ -15,12 +15,14 @@
 #ifndef SANTA__SANTAD__LOGS_ENDPOINTSECURITY_SERIALIZERS_SERIALIZER_H
 #define SANTA__SANTAD__LOGS_ENDPOINTSECURITY_SERIALIZERS_SERIALIZER_H
 
+#import <Foundation/Foundation.h>
+
 #include <memory>
 #include <vector>
 
-#import <Foundation/Foundation.h>
-
+#include "Source/common/SNTCachedDecision.h"
 #import "Source/common/SNTCommonEnums.h"
+#include "Source/santad/DecisionCache.h"
 #include "Source/santad/EventProviders/EndpointSecurity/EnrichedTypes.h"
 
 @class SNTStoredEvent;
@@ -29,7 +31,7 @@ namespace santa::santad::logs::endpoint_security::serializers {
 
 class Serializer {
  public:
-  Serializer();
+  Serializer(std::shared_ptr<santa::santad::DecisionCache> decision_cache);
   virtual ~Serializer() = default;
 
   std::vector<uint8_t> SerializeMessage(
@@ -46,7 +48,8 @@ class Serializer {
   virtual std::vector<uint8_t> SerializeMessage(
     const santa::santad::event_providers::endpoint_security::EnrichedExchange &) = 0;
   virtual std::vector<uint8_t> SerializeMessage(
-    const santa::santad::event_providers::endpoint_security::EnrichedExec &) = 0;
+    const santa::santad::event_providers::endpoint_security::EnrichedExec &,
+    SNTCachedDecision *cd) = 0;
   virtual std::vector<uint8_t> SerializeMessage(
     const santa::santad::event_providers::endpoint_security::EnrichedExit &) = 0;
   virtual std::vector<uint8_t> SerializeMessage(
@@ -92,6 +95,7 @@ class Serializer {
   std::vector<uint8_t> SerializeMessageTemplate(
     const santa::santad::event_providers::endpoint_security::EnrichedUnlink &);
 
+  std::shared_ptr<santa::santad::DecisionCache> decision_cache_;
   bool enabled_machine_id_ = false;
   std::string machine_id_;
 };

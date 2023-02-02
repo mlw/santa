@@ -17,13 +17,13 @@
 #include <memory>
 
 #include "Source/santad/DataLayer/WatchItems.h"
+#include "Source/santad/DecisionCache.h"
 #include "Source/santad/EventProviders/EndpointSecurity/EndpointSecurityAPI.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Enricher.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityClient.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityEventHandler.h"
 #include "Source/santad/Logs/EndpointSecurity/Logger.h"
 #include "Source/santad/Metrics.h"
-#import "Source/santad/SNTDecisionCache.h"
 
 @interface SNTEndpointSecurityFileAccessAuthorizer
     : SNTEndpointSecurityClient <SNTEndpointSecurityDynamicEventHandler>
@@ -36,6 +36,6 @@
      watchItems:(std::shared_ptr<santa::santad::data_layer::WatchItems>)watchItems
        enricher:
          (std::shared_ptr<santa::santad::event_providers::endpoint_security::Enricher>)enricher
-  decisionCache:(SNTDecisionCache *)decisionCache;
+  decisionCache:(std::shared_ptr<santa::santad::DecisionCache>)decisionCache;
 
 @end

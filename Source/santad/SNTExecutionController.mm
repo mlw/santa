@@ -38,7 +38,6 @@
 #include "Source/common/SantaVnode.h"
 #import "Source/santad/DataLayer/SNTEventTable.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
-#import "Source/santad/SNTDecisionCache.h"
 #import "Source/santad/SNTNotificationQueue.h"
 #import "Source/santad/SNTPolicyProcessor.h"
 #import "Source/santad/SNTSyncdQueue.h"
@@ -58,7 +57,9 @@ static const size_t kMaxAllowedPathLength = MAXPATHLEN - 1;  // -1 to account fo
 @property dispatch_queue_t eventQueue;
 @end
 
-@implementation SNTExecutionController
+@implementation SNTExecutionController {
+  std::shared_ptr<santa::santad::DecisionCache> _decisionCache;
+}
 
 static NSString *const kPrinterProxyPreMonterey =
   (@"/System/Library/Frameworks/Carbon.framework/Versions/Current/"
@@ -73,13 +74,15 @@ static NSString *const kPrinterProxyPostMonterey =
 - (instancetype)initWithRuleTable:(SNTRuleTable *)ruleTable
                        eventTable:(SNTEventTable *)eventTable
                     notifierQueue:(SNTNotificationQueue *)notifierQueue
-                       syncdQueue:(SNTSyncdQueue *)syncdQueue {
+                       syncdQueue:(SNTSyncdQueue *)syncdQueue
+                    decisionCache:(std::shared_ptr<santa::santad::DecisionCache>)decisionCache {
   self = [super init];
   if (self) {
     _ruleTable = ruleTable;
     _eventTable = eventTable;
     _notifierQueue = notifierQueue;
     _syncdQueue = syncdQueue;
+    _decisionCache = std::move(decisionCache);
     _policyProcessor = [[SNTPolicyProcessor alloc] initWithRuleTable:_ruleTable];
 
     _eventQueue =
@@ -149,7 +152,7 @@ static NSString *const kPrinterProxyPostMonterey =
     // TODO(mlw): We should be able to grab signing info to have more-enriched log messages in the
     // future. The code to do this should probably be abstracted from the SNTPolicyProcessor.
 
-    [[SNTDecisionCache sharedCache] cacheDecision:cd];
+    self->_decisionCache->CacheDecision(cd);
 
     return NO;
   }
@@ -210,7 +213,7 @@ static NSString *const kPrinterProxyPostMonterey =
   // Save decision details for logging the execution later.  For transitive rules, we also use
   // the shasum stored in the decision details to update the rule's timestamp whenever an
   // ACTION_NOTIFY_EXEC message related to the transitive rule is received.
-  [[SNTDecisionCache sharedCache] cacheDecision:cd];
+  self->_decisionCache->CacheDecision(cd);
 
   // Upgrade the action to SNTActionRespondAllowCompiler when appropriate, because we want the
   // kernel to track this information in its decision cache.

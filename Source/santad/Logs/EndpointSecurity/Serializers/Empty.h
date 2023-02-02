@@ -20,6 +20,7 @@
 #include <memory>
 #include <vector>
 
+#import "Source/common/SNTCachedDecision.h"
 #include "Source/santad/Logs/EndpointSecurity/Serializers/Serializer.h"
 
 namespace santa::santad::logs::endpoint_security::serializers {
@@ -27,13 +28,15 @@ namespace santa::santad::logs::endpoint_security::serializers {
 class Empty : public Serializer {
  public:
   static std::shared_ptr<Empty> Create();
+  Empty();
 
   std::vector<uint8_t> SerializeMessage(
     const santa::santad::event_providers::endpoint_security::EnrichedClose &) override;
   std::vector<uint8_t> SerializeMessage(
     const santa::santad::event_providers::endpoint_security::EnrichedExchange &) override;
   std::vector<uint8_t> SerializeMessage(
-    const santa::santad::event_providers::endpoint_security::EnrichedExec &) override;
+    const santa::santad::event_providers::endpoint_security::EnrichedExec &,
+    SNTCachedDecision *) override;
   std::vector<uint8_t> SerializeMessage(
     const santa::santad::event_providers::endpoint_security::EnrichedExit &) override;
   std::vector<uint8_t> SerializeMessage(

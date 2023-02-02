@@ -32,7 +32,6 @@
 #import "Source/common/SNTStoredEvent.h"
 #include "Source/santad/EventProviders/EndpointSecurity/EndpointSecurityAPI.h"
 #include "Source/santad/Logs/EndpointSecurity/Serializers/Utilities.h"
-#import "Source/santad/SNTDecisionCache.h"
 #include "google/protobuf/timestamp.pb.h"
 
 using google::protobuf::Arena;
@@ -63,11 +62,15 @@ namespace pbv1 = ::santa::pb::v1;
 
 namespace santa::santad::logs::endpoint_security::serializers {
 
-std::shared_ptr<Protobuf> Protobuf::Create(std::shared_ptr<EndpointSecurityAPI> esapi) {
-  return std::make_shared<Protobuf>(esapi);
+std::shared_ptr<Protobuf> Protobuf::Create(
+  std::shared_ptr<EndpointSecurityAPI> esapi,
+  std::shared_ptr<santa::santad::DecisionCache> decision_cache) {
+  return std::make_shared<Protobuf>(esapi, std::move(decision_cache));
 }
 
-Protobuf::Protobuf(std::shared_ptr<EndpointSecurityAPI> esapi) : esapi_(esapi) {}
+Protobuf::Protobuf(std::shared_ptr<EndpointSecurityAPI> esapi,
+                   std::shared_ptr<santa::santad::DecisionCache> decision_cache)
+    : Serializer(std::move(decision_cache)), esapi_(esapi) {}
 
 static inline void EncodeTimestamp(Timestamp *timestamp, struct timespec ts) {
   timestamp->set_seconds(ts.tv_sec);
@@ -418,15 +421,12 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedExchange &msg) {
   return FinalizeProto(santa_msg);
 }
 
-std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedExec &msg) {
+std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedExec &msg, SNTCachedDecision *cd) {
   Arena arena;
   ::pbv1::SantaMessage *santa_msg = CreateDefaultProto(&arena, msg);
 
   // Only need to grab the shared instance once
   static SNTConfigurator *configurator = [SNTConfigurator configurator];
-
-  SNTCachedDecision *cd = [[SNTDecisionCache sharedCache]
-    cachedDecisionForFile:msg.es_msg().event.exec.target->executable->stat];
 
   GetDecisionEnum(cd.decision);
 

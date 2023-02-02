@@ -14,9 +14,11 @@
 
 #import <Foundation/Foundation.h>
 
-#include "Source/santad/EventProviders/EndpointSecurity/Message.h"
+#include <memory>
 
 #import "Source/common/SNTCommonEnums.h"
+#include "Source/santad/DecisionCache.h"
+#include "Source/santad/EventProviders/EndpointSecurity/Message.h"
 
 const static NSString *kBlockBinary = @"BlockBinary";
 const static NSString *kAllowBinary = @"AllowBinary";
@@ -54,7 +56,8 @@ const static NSString *kBlockLongPath = @"BlockLongPath";
 - (instancetype)initWithRuleTable:(SNTRuleTable *)ruleTable
                        eventTable:(SNTEventTable *)eventTable
                     notifierQueue:(SNTNotificationQueue *)notifierQueue
-                       syncdQueue:(SNTSyncdQueue *)syncdQueue;
+                       syncdQueue:(SNTSyncdQueue *)syncdQueue
+                    decisionCache:(std::shared_ptr<santa::santad::DecisionCache>)decisionCache;
 
 ///
 ///  Handles the logic of deciding whether to allow the binary to run or not, sends the response to

@@ -17,14 +17,15 @@
 #include <EndpointSecurity/EndpointSecurity.h>
 #include <string_view>
 
+#include "Source/common/SNTCachedDecision.h"
 #import "Source/common/SNTConfigurator.h"
-#import "Source/santad/SNTDecisionCache.h"
 
 namespace es = santa::santad::event_providers::endpoint_security;
 
 namespace santa::santad::logs::endpoint_security::serializers {
 
-Serializer::Serializer() {
+Serializer::Serializer(std::shared_ptr<santa::santad::DecisionCache> decision_cache)
+    : decision_cache_(std::move(decision_cache)) {
   if ([[SNTConfigurator configurator] enableMachineIDDecoration]) {
     enabled_machine_id_ = true;
     machine_id_ = [[[SNTConfigurator configurator] machineID] UTF8String] ?: "";
@@ -47,14 +48,17 @@ std::vector<uint8_t> Serializer::SerializeMessageTemplate(const es::EnrichedExch
 }
 std::vector<uint8_t> Serializer::SerializeMessageTemplate(const es::EnrichedExec &msg) {
   const es_message_t &es_msg = msg.es_msg();
+  SNTCachedDecision *cd;
   if (es_msg.action_type == ES_ACTION_TYPE_NOTIFY &&
       es_msg.action.notify.result.auth == ES_AUTH_RESULT_ALLOW) {
     // For allowed execs, cached decision timestamps must be updated
-    [[SNTDecisionCache sharedCache]
-      resetTimestampForCachedDecision:msg.es_msg().event.exec.target->executable->stat];
+    cd = decision_cache_->ResetTimestampForCachedDecision(
+      msg.es_msg().event.exec.target->executable->stat);
+  } else {
+    cd = decision_cache_->CachedDecisionForFile(msg.es_msg().event.exec.target->executable->stat);
   }
 
-  return SerializeMessage(msg);
+  return SerializeMessage(msg, cd);
 }
 std::vector<uint8_t> Serializer::SerializeMessageTemplate(const es::EnrichedExit &msg) {
   return SerializeMessage(msg);

@@ -17,10 +17,15 @@
 
 #include <memory>
 
+#include "Source/santad/DecisionCache.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Message.h"
 #include "Source/santad/Logs/EndpointSecurity/Logger.h"
 
 @interface SNTCompilerController : NSObject
+
+- (instancetype)init NS_UNAVAILABLE;
+
+- (instancetype)initWithDecisionCache:(std::shared_ptr<santa::santad::DecisionCache>)decision_cache;
 
 // This function will determine if the instigating process was a compiler and,
 // for appropriate events, will create appropriate transitive rules.

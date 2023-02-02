@@ -23,6 +23,10 @@
 
 namespace santa::santad {
 
+std::shared_ptr<DecisionCache> DecisionCache::Create() {
+  return std::make_shared<DecisionCache>();
+}
+
 DecisionCache::DecisionCache() {
   timestamp_reset_map_ = [[NSCache alloc] init];
   timestamp_reset_map_.countLimit = 100;

@@ -34,10 +34,10 @@
 #import "Source/santad/EventProviders/SNTEndpointSecurityTamperResistance.h"
 #include "Source/santad/Logs/EndpointSecurity/Logger.h"
 #include "Source/santad/SNTDaemonControlController.h"
-#include "Source/santad/SNTDecisionCache.h"
 
 using santa::common::PrefixTree;
 using santa::common::Unit;
+using santa::santad::DecisionCache;
 using santa::santad::Metrics;
 using santa::santad::data_layer::WatchItems;
 using santa::santad::event_providers::AuthResultCache;
@@ -69,7 +69,7 @@ static void EstablishSyncServiceConnection(SNTSyncdQueue *syncd_queue) {
 }
 
 void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logger> logger,
-                std::shared_ptr<Metrics> metrics,
+                std::shared_ptr<Metrics> metrics, std::shared_ptr<DecisionCache> decision_cache,
                 std::shared_ptr<santa::santad::data_layer::WatchItems> watch_items,
                 std::shared_ptr<Enricher> enricher,
                 std::shared_ptr<AuthResultCache> auth_result_cache,
@@ -134,7 +134,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                                                             logger:logger
                                                         watchItems:watch_items
                                                           enricher:enricher
-                                                     decisionCache:[SNTDecisionCache sharedCache]];
+                                                     decisionCache:decision_cache];
   watch_items->RegisterClient(access_authorizer_client);
 
   EstablishSyncServiceConnection(syncd_queue);

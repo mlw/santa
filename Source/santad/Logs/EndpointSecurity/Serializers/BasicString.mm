@@ -34,7 +34,6 @@
 #import "Source/common/SNTStoredEvent.h"
 #include "Source/santad/Logs/EndpointSecurity/Serializers/SanitizableString.h"
 #include "Source/santad/Logs/EndpointSecurity/Serializers/Utilities.h"
-#import "Source/santad/SNTDecisionCache.h"
 
 using santa::santad::event_providers::endpoint_security::EndpointSecurityAPI;
 using santa::santad::event_providers::endpoint_security::EnrichedClose;
@@ -176,13 +175,19 @@ static char *FormattedDateString(char *buf, size_t len) {
   return buf;
 }
 
-std::shared_ptr<BasicString> BasicString::Create(std::shared_ptr<EndpointSecurityAPI> esapi,
-                                                 bool prefix_time_name) {
-  return std::make_shared<BasicString>(esapi, prefix_time_name);
+std::shared_ptr<BasicString> BasicString::Create(
+  std::shared_ptr<EndpointSecurityAPI> esapi,
+  std::shared_ptr<santa::santad::DecisionCache> decision_cache, bool prefix_time_name) {
+  return std::make_shared<BasicString>(std::move(esapi), std::move(decision_cache),
+                                       prefix_time_name);
 }
 
-BasicString::BasicString(std::shared_ptr<EndpointSecurityAPI> esapi, bool prefix_time_name)
-    : esapi_(esapi), prefix_time_name_(prefix_time_name) {}
+BasicString::BasicString(std::shared_ptr<EndpointSecurityAPI> esapi,
+                         std::shared_ptr<santa::santad::DecisionCache> decision_cache,
+                         bool prefix_time_name)
+    : Serializer(std::move(decision_cache)),
+      esapi_(std::move(esapi)),
+      prefix_time_name_(prefix_time_name) {}
 
 std::string BasicString::CreateDefaultString(size_t reserved_size) {
   std::string str;
@@ -241,15 +246,12 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedExchange &msg) 
   return FinalizeString(str);
 }
 
-std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedExec &msg) {
+std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedExec &msg, SNTCachedDecision *cd) {
   const es_message_t &esm = msg.es_msg();
   std::string str = CreateDefaultString(1024);  // EXECs tend to be bigger, reserve more space.
 
   // Only need to grab the shared instance once
   static SNTConfigurator *configurator = [SNTConfigurator configurator];
-
-  SNTCachedDecision *cd =
-    [[SNTDecisionCache sharedCache] cachedDecisionForFile:esm.event.exec.target->executable->stat];
 
   str.append("action=EXEC|decision=");
   str.append(GetDecisionString(cd.decision));

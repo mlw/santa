@@ -27,6 +27,7 @@
 
 using santa::common::PrefixTree;
 using santa::common::Unit;
+using santa::santad::DecisionCache;
 using santa::santad::Metrics;
 using santa::santad::data_layer::WatchItems;
 using santa::santad::event_providers::AuthResultCache;
@@ -62,7 +63,14 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator *configurator,
     exit(EXIT_FAILURE);
   }
 
-  SNTCompilerController *compiler_controller = [[SNTCompilerController alloc] init];
+  std::shared_ptr<::DecisionCache> decision_cache = DecisionCache::Create();
+  if (!decision_cache) {
+    LOGE(@"Failed to create decision cache");
+    exit(EXIT_FAILURE);
+  }
+
+  SNTCompilerController *compiler_controller =
+    [[SNTCompilerController alloc] initWithDecisionCache:decision_cache];
   if (!compiler_controller) {
     LOGE(@"Failed to initialize compiler controller.");
     exit(EXIT_FAILURE);
@@ -84,7 +92,8 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator *configurator,
     [[SNTExecutionController alloc] initWithRuleTable:rule_table
                                            eventTable:event_table
                                         notifierQueue:notifier_queue
-                                           syncdQueue:syncd_queue];
+                                           syncdQueue:syncd_queue
+                                        decisionCache:decision_cache];
   if (!exec_controller) {
     LOGE(@"Failed to initialize exec controller.");
     exit(EXIT_FAILURE);
@@ -109,9 +118,10 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator *configurator,
   size_t spool_dir_threshold_bytes = [configurator spoolDirectorySizeThresholdMB] * 1024 * 1024;
   uint64_t spool_flush_timeout_ms = [configurator spoolDirectoryEventMaxFlushTimeSec] * 1000;
 
-  std::unique_ptr<::Logger> logger = Logger::Create(
-    esapi, [configurator eventLogType], [configurator eventLogPath], [configurator spoolDirectory],
-    spool_dir_threshold_bytes, spool_file_threshold_bytes, spool_flush_timeout_ms);
+  std::unique_ptr<::Logger> logger =
+    Logger::Create(esapi, [configurator eventLogType], decision_cache, [configurator eventLogPath],
+                   [configurator spoolDirectory], spool_dir_threshold_bytes,
+                   spool_file_threshold_bytes, spool_flush_timeout_ms);
   if (!logger) {
     LOGE(@"Failed to create logger.");
     exit(EXIT_FAILURE);
@@ -131,13 +141,15 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator *configurator,
     exit(EXIT_FAILURE);
   }
 
-  return std::make_unique<SantadDeps>(
-    esapi, std::move(logger), std::move(metrics), std::move(watch_items), control_connection,
-    compiler_controller, notifier_queue, syncd_queue, exec_controller, prefix_tree);
+  return std::make_unique<SantadDeps>(esapi, std::move(logger), std::move(metrics),
+                                      std::move(decision_cache), std::move(watch_items),
+                                      control_connection, compiler_controller, notifier_queue,
+                                      syncd_queue, exec_controller, prefix_tree);
 }
 
 SantadDeps::SantadDeps(std::shared_ptr<EndpointSecurityAPI> esapi, std::unique_ptr<::Logger> logger,
                        std::shared_ptr<::Metrics> metrics,
+                       std::shared_ptr<::DecisionCache> decision_cache,
                        std::shared_ptr<::WatchItems> watch_items,
                        MOLXPCConnection *control_connection,
                        SNTCompilerController *compiler_controller,
@@ -174,6 +186,10 @@ std::shared_ptr<Logger> SantadDeps::Logger() {
 
 std::shared_ptr<::Metrics> SantadDeps::Metrics() {
   return metrics_;
+}
+
+std::shared_ptr<::DecisionCache> SantadDeps::DecisionCache() {
+  return decision_cache_;
 }
 
 std::shared_ptr<::WatchItems> SantadDeps::WatchItems() {

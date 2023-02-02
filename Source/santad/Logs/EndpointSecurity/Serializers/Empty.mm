@@ -31,6 +31,8 @@ std::shared_ptr<Empty> Empty::Create() {
   return std::make_shared<Empty>();
 }
 
+Empty::Empty() : Serializer(nullptr) {}
+
 std::vector<uint8_t> Empty::SerializeMessage(const EnrichedClose &msg) {
   return {};
 }
@@ -39,7 +41,7 @@ std::vector<uint8_t> Empty::SerializeMessage(const EnrichedExchange &msg) {
   return {};
 }
 
-std::vector<uint8_t> Empty::SerializeMessage(const EnrichedExec &msg) {
+std::vector<uint8_t> Empty::SerializeMessage(const EnrichedExec &msg, SNTCachedDecision *cd) {
   return {};
 }
 

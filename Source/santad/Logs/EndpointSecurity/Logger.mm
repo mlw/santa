@@ -48,24 +48,27 @@ static const size_t kMaxExpectedWriteSizeBytes = 4096;
 
 // Translate configured log type to appropriate Serializer/Writer pairs
 std::unique_ptr<Logger> Logger::Create(std::shared_ptr<EndpointSecurityAPI> esapi,
-                                       SNTEventLogType log_type, NSString *event_log_path,
-                                       NSString *spool_log_path, size_t spool_dir_size_threshold,
+                                       SNTEventLogType log_type,
+                                       std::shared_ptr<santa::santad::DecisionCache> decision_cache,
+                                       NSString *event_log_path, NSString *spool_log_path,
+                                       size_t spool_dir_size_threshold,
                                        size_t spool_file_size_threshold,
                                        uint64_t spool_flush_timeout_ms) {
   switch (log_type) {
     case SNTEventLogTypeFilelog:
       return std::make_unique<Logger>(
-        BasicString::Create(esapi),
+        BasicString::Create(esapi, std::move(decision_cache)),
         File::Create(event_log_path, kFlushBufferTimeoutMS, kBufferBatchSizeBytes,
                      kMaxExpectedWriteSizeBytes));
     case SNTEventLogTypeSyslog:
-      return std::make_unique<Logger>(BasicString::Create(esapi, false), Syslog::Create());
+      return std::make_unique<Logger>(BasicString::Create(esapi, std::move(decision_cache), false),
+                                      Syslog::Create());
     case SNTEventLogTypeNull: return std::make_unique<Logger>(Empty::Create(), Null::Create());
     case SNTEventLogTypeProtobuf:
       LOGW(@"The EventLogType value protobuf is currently in beta. The protobuf schema is subject "
            @"to change.");
       return std::make_unique<Logger>(
-        Protobuf::Create(esapi),
+        Protobuf::Create(esapi, std::move(decision_cache)),
         Spool::Create([spool_log_path UTF8String], spool_dir_size_threshold,
                       spool_file_size_threshold, spool_flush_timeout_ms));
     default: LOGE(@"Invalid log type: %ld", log_type); return nullptr;
