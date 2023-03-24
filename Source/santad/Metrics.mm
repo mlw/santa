@@ -109,11 +109,6 @@ NSString *const EventDispositionToString(EventDisposition d) {
 }
 
 std::shared_ptr<Metrics> Metrics::Create(SNTMetricSet *metric_set, uint64_t interval) {
-  dispatch_queue_t q = dispatch_queue_create("com.google.santa.santametricsservice.q",
-                                             DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL);
-
-  dispatch_source_t timer_source = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, q);
-
   SNTMetricInt64Gauge *event_processing_times =
     [metric_set int64GaugeWithName:@"/santa/event_processing_time"
                         fieldNames:@[ @"Processor", @"Event" ]
@@ -129,52 +124,61 @@ std::shared_ptr<Metrics> Metrics::Create(SNTMetricSet *metric_set, uint64_t inte
                      fieldNames:@[ @"Processor" ]
                        helpText:@"Events rate limited by each processor"];
 
+  santa::common::PeriodicTimer timer =
+    santa::common::PeriodicTimer::Create(interval, 0, Metrics::Run);
+
   std::shared_ptr<Metrics> metrics =
-    std::make_shared<Metrics>(q, timer_source, interval, event_processing_times, event_counts,
+    std::make_shared<Metrics>(std::move(timer), interval, event_processing_times, event_counts,
                               rate_limit_counts, metric_set, ^(Metrics *metrics) {
                                 SNTRegisterCoreMetrics();
                                 metrics->EstablishConnection();
                               });
 
-  std::weak_ptr<Metrics> weak_metrics(metrics);
-  dispatch_source_set_event_handler(metrics->timer_source_, ^{
-    std::shared_ptr<Metrics> shared_metrics = weak_metrics.lock();
-    if (!shared_metrics) {
-      return;
-    }
+  // std::weak_ptr<Metrics> weak_metrics(metrics);
+  // dispatch_source_set_event_handler(metrics->timer_source_, ^{
+  //   std::shared_ptr<Metrics> shared_metrics = weak_metrics.lock();
+  //   if (!shared_metrics) {
+  //     return;
+  //   }
 
-    shared_metrics->ExportLocked(metric_set);
-  });
+  //   shared_metrics->ExportLocked(metric_set);
+  // });
 
   return metrics;
 }
 
-Metrics::Metrics(dispatch_queue_t q, dispatch_source_t timer_source, uint64_t interval,
+void Metrics::Run(std::any ctx) {
+  LOGE(@"In Metrics::Run...\n");
+  std::weak_ptr<Metrics> weak_metrics = std::any_cast<std::weak_ptr<Metrics>>(ctx);
+  std::shared_ptr<Metrics> metrics = weak_metrics.lock();
+  if (metrics) {
+    LOGE(@"Got shared from weak!\n");
+    metrics->PrintFromObj();
+    metrics->ExportLocked();
+    LOGE(@"Done exporting...");
+  }
+}
+
+// DELETEME - TEST ONLY
+void Metrics::PrintFromObj() {
+  LOGE(@"Printing from obj!\n");
+}
+
+Metrics::Metrics(santa::common::PeriodicTimer timer, uint64_t interval,
                  SNTMetricInt64Gauge *event_processing_times, SNTMetricCounter *event_counts,
                  SNTMetricCounter *rate_limit_counts, SNTMetricSet *metric_set,
                  void (^run_on_first_start)(Metrics *))
-    : q_(q),
-      timer_source_(timer_source),
+    : timer_(std::move(timer)),
+      // q_(q),
       interval_(interval),
       event_processing_times_(event_processing_times),
       event_counts_(event_counts),
       rate_limit_counts_(rate_limit_counts),
       metric_set_(metric_set),
       run_on_first_start_(run_on_first_start) {
-  SetInterval(interval_);
-
   events_q_ = dispatch_queue_create("com.google.santa.santametricsservice.events_q",
                                     DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL);
-}
-
-Metrics::~Metrics() {
-  if (!running_) {
-    // The timer_source_ must be resumed to ensure it has a proper retain count before being
-    // destroyed. Additionally, it should first be cancelled to ensure the timer isn't ever fired
-    // (see man page for `dispatch_source_cancel(3)`).
-    dispatch_source_cancel(timer_source_);
-    dispatch_resume(timer_source_);
-  }
+  SetInterval(interval);
 }
 
 void Metrics::EstablishConnection() {
@@ -190,14 +194,14 @@ void Metrics::EstablishConnection() {
 }
 
 void Metrics::Export() {
-  dispatch_sync(q_, ^{
-    ExportLocked(metric_set_);
+  timer_.RunSynchronouslyWithTimer(^{
+    ExportLocked();
   });
 }
 
-void Metrics::ExportLocked(SNTMetricSet *metric_set) {
+void Metrics::ExportLocked() {
   FlushMetrics();
-  [[metrics_connection_ remoteObjectProxy] exportForMonitoring:[metric_set export]];
+  [[metrics_connection_ remoteObjectProxy] exportForMonitoring:[metric_set_ export]];
 }
 
 void Metrics::FlushMetrics() {
@@ -232,12 +236,7 @@ void Metrics::FlushMetrics() {
 }
 
 void Metrics::SetInterval(uint64_t interval) {
-  dispatch_sync(q_, ^{
-    LOGI(@"Setting metrics interval to %llu (exporting? %s)", interval, running_ ? "YES" : "NO");
-    interval_ = interval;
-    dispatch_source_set_timer(timer_source_, dispatch_time(DISPATCH_TIME_NOW, 0),
-                              interval_ * NSEC_PER_SEC, 250 * NSEC_PER_MSEC);
-  });
+  timer_.SetInterval(interval * 1000);
 }
 
 void Metrics::StartPoll() {
@@ -246,27 +245,13 @@ void Metrics::StartPoll() {
     run_on_first_start_(this);
   });
 
-  dispatch_sync(q_, ^{
-    if (!running_) {
-      LOGI(@"Starting to export metrics every %llu seconds", interval_);
-      running_ = true;
-      dispatch_resume(timer_source_);
-    } else {
-      LOGW(@"Attempted to start metrics poll while already started");
-    }
-  });
+  LOGI(@"Starting to export metrics every %llu seconds", timer_.IntervalMS() / 1000);
+  std::weak_ptr<Metrics> weak_metrics = weak_from_this();
+  timer_.Start(weak_metrics);
 }
 
 void Metrics::StopPoll() {
-  dispatch_sync(q_, ^{
-    if (running_) {
-      LOGI(@"Stopping metrics export");
-      dispatch_suspend(timer_source_);
-      running_ = false;
-    } else {
-      LOGW(@"Attempted to stop metrics poll while already stopped");
-    }
-  });
+  timer_.Stop();
 }
 
 void Metrics::SetEventMetrics(Processor processor, es_event_type_t event_type,

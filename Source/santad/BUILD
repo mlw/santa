@@ -641,6 +641,7 @@ objc_library(
     hdrs = ["Metrics.h"],
     deps = [
         ":SNTApplicationCoreMetrics",
+        "//Source/common:PeriodicTimer",
         "//Source/common:SNTLogging",
         "//Source/common:SNTMetricSet",
         "//Source/common:SNTXPCMetricServiceInterface",
@@ -1091,6 +1092,7 @@ santa_unit_test(
     srcs = ["MetricsTest.mm"],
     deps = [
         ":Metrics",
+        "//Source/common:PeriodicTimer",
         "//Source/common:SNTMetricSet",
         "//Source/common:TestUtils",
         "@OCMock",

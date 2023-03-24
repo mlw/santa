@@ -80,6 +80,14 @@ objc_library(
 )
 
 objc_library(
+    name = "PeriodicTimer",
+    srcs = ["PeriodicTimer.mm"],
+    hdrs = ["PeriodicTimer.h"],
+    deps = [
+    ],
+)
+
+objc_library(
     name = "SNTBlockMessage",
     srcs = ["SNTBlockMessage.m"],
     hdrs = ["SNTBlockMessage.h"],
@@ -375,9 +383,18 @@ santa_unit_test(
     ],
 )
 
+santa_unit_test(
+    name = "PeriodicTimerTest",
+    srcs = ["PeriodicTimerTest.mm"],
+    deps = [
+        ":PeriodicTimer",
+    ],
+)
+
 test_suite(
     name = "unit_tests",
     tests = [
+        ":PeriodicTimerTest",
         ":PrefixTreeTest",
         ":SNTCachedDecisionTest",
         ":SNTFileInfoTest",

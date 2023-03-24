@@ -23,6 +23,7 @@
 #include <map>
 #include <memory>
 
+#include "Source/common/PeriodicTimer.h"
 #import "Source/common/SNTMetricSet.h"
 
 namespace santa::santad {
@@ -51,12 +52,12 @@ class Metrics : public std::enable_shared_from_this<Metrics> {
  public:
   static std::shared_ptr<Metrics> Create(SNTMetricSet *metric_set, uint64_t interval);
 
-  Metrics(dispatch_queue_t q, dispatch_source_t timer_source, uint64_t interval,
+  Metrics(santa::common::PeriodicTimer timer, uint64_t interval,
           SNTMetricInt64Gauge *event_processing_times, SNTMetricCounter *event_counts,
           SNTMetricCounter *rate_limit_counts, SNTMetricSet *metric_set,
           void (^run_on_first_start)(Metrics *));
 
-  ~Metrics();
+  ~Metrics() = default;
 
   void EstablishConnection();
   void StartPoll();
@@ -65,6 +66,9 @@ class Metrics : public std::enable_shared_from_this<Metrics> {
 
   // Force an immediate flush and export of metrics
   void Export();
+
+  static void Run(std::any ctx);
+  void PrintFromObj();
 
   void SetEventMetrics(Processor processor, es_event_type_t event_type,
                        EventDisposition disposition, int64_t nanos);
@@ -75,11 +79,10 @@ class Metrics : public std::enable_shared_from_this<Metrics> {
 
  private:
   void FlushMetrics();
-  void ExportLocked(SNTMetricSet *metric_set);
+  void ExportLocked();
 
   MOLXPCConnection *metrics_connection_;
-  dispatch_queue_t q_;
-  dispatch_source_t timer_source_;
+  santa::common::PeriodicTimer timer_;
   uint64_t interval_;
   SNTMetricInt64Gauge *event_processing_times_;
   SNTMetricCounter *event_counts_;
