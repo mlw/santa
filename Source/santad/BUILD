@@ -192,10 +192,11 @@ objc_library(
     srcs = [
         "DataLayer/SNTDatabaseTable.h",
         "DataLayer/SNTRuleTable.h",
-        "SNTPolicyProcessor.m",
+        "SNTPolicyProcessor.mm",
     ],
     hdrs = ["SNTPolicyProcessor.h"],
     deps = [
+        ":SNTDecisionCache",
         "//Source/common:SNTCachedDecision",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTConfigurator",
@@ -283,6 +284,7 @@ objc_library(
         ":EndpointSecurityMessage",
         ":Metrics",
         ":SNTCompilerController",
+        ":SNTDecisionCache",
         ":SNTEndpointSecurityClient",
         ":SNTEndpointSecurityEventHandler",
         "//Source/common:PrefixTree",

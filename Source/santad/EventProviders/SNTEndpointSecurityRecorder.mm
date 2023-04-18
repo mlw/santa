@@ -21,6 +21,7 @@
 #include "Source/santad/EventProviders/EndpointSecurity/EnrichedTypes.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Message.h"
 #include "Source/santad/Metrics.h"
+#import "Source/santad/SNTDecisionCache.h"
 
 using santa::common::PrefixTree;
 using santa::common::Unit;
@@ -44,6 +45,7 @@ es_file_t *GetTargetFileForPrefixTree(const es_message_t *msg) {
 
 @interface SNTEndpointSecurityRecorder ()
 @property SNTCompilerController *compilerController;
+@property SNTDecisionCache *decisionCache;
 @end
 
 @implementation SNTEndpointSecurityRecorder {
@@ -70,6 +72,8 @@ es_file_t *GetTargetFileForPrefixTree(const es_message_t *msg) {
     _authResultCache = authResultCache;
     _prefixTree = prefixTree;
 
+    _decisionCache = [SNTDecisionCache sharedCache];
+
     [self establishClientOrDie];
   }
   return self;
@@ -95,6 +99,7 @@ es_file_t *GetTargetFileForPrefixTree(const es_message_t *msg) {
       }
 
       self->_authResultCache->RemoveFromCache(esMsg->event.close.target);
+      [self.decisionCache forgetCachedDecisionForFile:esMsg->event.close.target->stat];
       break;
     default: break;
   }

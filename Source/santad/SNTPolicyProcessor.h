@@ -36,15 +36,10 @@
 
 ///
 ///  @param fileInfo A SNTFileInfo object.
-///  @param fileSHA256 The pre-calculated SHA256 hash for the file, can be nil. If nil the hash will
-///                    be calculated by this method from the filePath.
-///  @param certificateSHA256 The pre-calculated SHA256 hash of the leaf certificate. If nil, the
-///                    signature will be validated on the binary represented by fileInfo.
+///  @param SNTCachedDecision The object to update based on current rule information.
 ///
 - (nonnull SNTCachedDecision *)decisionForFileInfo:(nonnull SNTFileInfo *)fileInfo
-                                        fileSHA256:(nullable NSString *)fileSHA256
-                                 certificateSHA256:(nullable NSString *)certificateSHA256
-                                            teamID:(nullable NSString *)teamID;
+                                    cachedDecision:(nullable SNTCachedDecision *)cd;
 
 ///  Convenience initializer with nil hashes for both the file and certificate.
 - (nonnull SNTCachedDecision *)decisionForFileInfo:(nonnull SNTFileInfo *)fileInfo;

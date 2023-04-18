@@ -183,6 +183,7 @@ objc_library(
     hdrs = ["SNTFileInfo.h"],
     deps = [
         ":SNTLogging",
+        ":SantaVnode",
         "@FMDB",
         "@MOLCodesignChecker",
     ],

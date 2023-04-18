@@ -23,6 +23,7 @@
 #import "Source/common/SNTFileInfo.h"
 #import "Source/common/SNTRule.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
+#import "Source/santad/SNTDecisionCache.h"
 
 @interface SNTPolicyProcessor ()
 @property SNTRuleTable *ruleTable;
@@ -38,10 +39,10 @@
   return self;
 }
 
-- (nonnull SNTCachedDecision *)decisionForFileInfo:(nonnull SNTFileInfo *)fileInfo
-                                        fileSHA256:(nullable NSString *)fileSHA256
-                                 certificateSHA256:(nullable NSString *)certificateSHA256
-                                            teamID:(nullable NSString *)teamID {
+- (nonnull SNTCachedDecision *)cachedDecisionWithFileInfo:(nonnull SNTFileInfo *)fileInfo
+                                               fileSHA256:(nullable NSString *)fileSHA256
+                                        certificateSHA256:(nullable NSString *)certificateSHA256
+                                                   teamID:(nullable NSString *)teamID {
   SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
   cd.sha256 = fileSHA256 ?: fileInfo.SHA256;
   cd.teamID = teamID;
@@ -67,14 +68,20 @@
       cd.certCommonName = csInfo.leafCertificate.commonName;
       cd.certChain = csInfo.certificates;
       cd.teamID = teamID ?: [csInfo.signingInformation valueForKey:@"teamid"];
-      teamID = cd.teamID;
     }
   }
-  cd.quarantineURL = fileInfo.quarantineDataURL;
 
+  cd.quarantineURL = fileInfo.quarantineDataURL;
+  cd.vnodeId = fileInfo.vnodeId;
+
+  return cd;
+}
+
+- (nonnull SNTCachedDecision *)decisionForFileInfo:(nonnull SNTFileInfo *)fileInfo
+                                    cachedDecision:(nullable SNTCachedDecision *)cd {
   SNTRule *rule = [self.ruleTable ruleForBinarySHA256:cd.sha256
                                     certificateSHA256:cd.certSHA256
-                                               teamID:teamID];
+                                               teamID:cd.teamID];
   if (rule) {
     switch (rule.type) {
       case SNTRuleTypeBinary:
@@ -139,6 +146,8 @@
     }
   }
 
+  NSError *csInfoError = [fileInfo codesignError];
+
   if ([[SNTConfigurator configurator] enableBadSignatureProtection] && csInfoError &&
       csInfoError.code != errSecCSUnsigned) {
     cd.decisionExtra =
@@ -169,7 +178,11 @@
 }
 
 - (nonnull SNTCachedDecision *)decisionForFileInfo:(nonnull SNTFileInfo *)fileInfo {
-  return [self decisionForFileInfo:fileInfo fileSHA256:nil certificateSHA256:nil teamID:nil];
+  SNTCachedDecision *cd = [[SNTDecisionCache sharedCache] cachedDecisionForVnode:fileInfo.vnodeId];
+  if (!cd) {
+    cd = [self cachedDecisionWithFileInfo:fileInfo fileSHA256:nil certificateSHA256:nil teamID:nil];
+  }
+  return [self decisionForFileInfo:fileInfo cachedDecision:cd];
 }
 
 // Used by `$ santactl fileinfo`.
@@ -177,14 +190,18 @@
                                         fileSHA256:(nullable NSString *)fileSHA256
                                  certificateSHA256:(nullable NSString *)certificateSHA256
                                             teamID:(nullable NSString *)teamID {
-  SNTFileInfo *fileInfo;
   NSError *error;
-  fileInfo = [[SNTFileInfo alloc] initWithPath:filePath error:&error];
-  if (!fileInfo) LOGW(@"Failed to read file %@: %@", filePath, error.localizedDescription);
-  return [self decisionForFileInfo:fileInfo
-                        fileSHA256:fileSHA256
-                 certificateSHA256:certificateSHA256
-                            teamID:teamID];
+  SNTFileInfo *fileInfo = [[SNTFileInfo alloc] initWithPath:filePath error:&error];
+  if (!fileInfo) {
+    LOGW(@"Failed to read file %@: %@", filePath, error.localizedDescription);
+  }
+
+  SNTCachedDecision *cd = [self cachedDecisionWithFileInfo:fileInfo
+                                                fileSHA256:fileSHA256
+                                         certificateSHA256:certificateSHA256
+                                                    teamID:teamID];
+
+  return [self decisionForFileInfo:fileInfo cachedDecision:cd];
 }
 
 ///

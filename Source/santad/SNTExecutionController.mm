@@ -202,8 +202,6 @@ static NSString *const kPrinterProxyPostMonterey =
 
   SNTCachedDecision *cd = [self.policyProcessor decisionForFileInfo:binInfo];
 
-  cd.vnodeId = SantaVnode::VnodeForFile(targetProc->executable);
-
   // Formulate an initial action from the decision.
   SNTAction action =
     (SNTEventStateAllow & cd.decision) ? SNTActionRespondAllow : SNTActionRespondDeny;

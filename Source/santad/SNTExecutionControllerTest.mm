@@ -65,6 +65,9 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
   self.mockDecisionCache = OCMStrictClassMock([SNTDecisionCache class]);
   OCMStub([self.mockDecisionCache sharedCache]).andReturn(self.mockDecisionCache);
   OCMStub([self.mockDecisionCache cacheDecision:OCMOCK_ANY]);
+  OCMStub([self.mockDecisionCache cachedDecisionForVnode:{}])
+    .ignoringNonObjectArgs()
+    .andReturn(nil);
 
   [[SNTMetricSet sharedInstance] reset];
 

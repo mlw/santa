@@ -63,11 +63,21 @@ SNTCachedDecision *MakeCachedDecision(struct stat sb, SNTEventState decision) {
   SNTCachedDecision *cd = MakeCachedDecision(sb, SNTEventStateAllowTeamID);
   [dc cacheDecision:cd];
 
-  // Ensure the item exists in the cache
-  SNTCachedDecision *cachedCD = [dc cachedDecisionForFile:sb];
-  XCTAssertNotNil(cachedCD);
-  XCTAssertEqual(cachedCD.decision, cd.decision);
-  XCTAssertEqual(cachedCD.vnodeId.fileid, cd.vnodeId.fileid);
+  // Ensure the item exists in the cache via stat info
+  {
+    SNTCachedDecision *cachedCD = [dc cachedDecisionForFile:sb];
+    XCTAssertNotNil(cachedCD);
+    XCTAssertEqual(cachedCD.decision, cd.decision);
+    XCTAssertEqual(cachedCD.vnodeId.fileid, cd.vnodeId.fileid);
+  }
+
+  // Ensure the item exists in the cache via vnode info
+  {
+    SNTCachedDecision *cachedCD = [dc cachedDecisionForVnode:SantaVnode::VnodeForFile(sb)];
+    XCTAssertNotNil(cachedCD);
+    XCTAssertEqual(cachedCD.decision, cd.decision);
+    XCTAssertEqual(cachedCD.vnodeId.fileid, cd.vnodeId.fileid);
+  }
 
   // Delete the item from the cache and ensure it no longer exists
   [dc forgetCachedDecisionForFile:sb];

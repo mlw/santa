@@ -55,7 +55,11 @@
 }
 
 - (SNTCachedDecision *)cachedDecisionForFile:(const struct stat &)statInfo {
-  return self->_decisionCache.get(SantaVnode::VnodeForFile(statInfo));
+  return [self cachedDecisionForVnode:SantaVnode::VnodeForFile(statInfo)];
+}
+
+- (SNTCachedDecision *)cachedDecisionForVnode:(SantaVnode)vnode {
+  return self->_decisionCache.get(vnode);
 }
 
 - (void)forgetCachedDecisionForFile:(const struct stat &)statInfo {

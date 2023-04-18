@@ -58,7 +58,7 @@
 @property NSDictionary *quarantineDict;
 @property NSDictionary *cachedHeaders;
 @property MOLCodesignChecker *cachedCodesignChecker;
-@property(nonatomic) NSError *codesignCheckerError;
+@property NSError *codesignCheckerError;
 @end
 
 @implementation SNTFileInfo
@@ -98,6 +98,11 @@ extern NSString *const NSURLQuarantinePropertiesKey WEAK_IMPORT_ATTRIBUTE;
       }
       return nil;
     }
+
+    _vnodeId = (SantaVnode){
+      .fsid = fileStat->st_dev,
+      .fileid = fileStat->st_ino,
+    };
 
     if (!((S_IFMT & fileStat->st_mode) == S_IFREG)) {
       if (error) {
@@ -783,6 +788,12 @@ extern NSString *const NSURLQuarantinePropertiesKey WEAK_IMPORT_ATTRIBUTE;
   }
   if (error) *error = self.codesignCheckerError;
   return self.cachedCodesignChecker;
+}
+
+- (NSError *)codesignError {
+  // First make sure that the code signature was checked
+  [self codesignCheckerWithError:nil];
+  return self.codesignCheckerError;
 }
 
 @end

@@ -14,6 +14,9 @@
 
 #import <EndpointSecurity/EndpointSecurity.h>
 #import <Foundation/Foundation.h>
+#include <sys/stat.h>
+
+#import "Source/common/SantaVnode.h"
 
 @class MOLCodesignChecker;
 
@@ -23,8 +26,22 @@
 ///
 @interface SNTFileInfo : NSObject
 
+- (instancetype)init NS_UNAVAILABLE;
+
 ///
 ///  Designated initializer.
+///
+/// @param path The path of the file this instance is to represent. The path will
+///      not be resolved and will be used as is. If the path is not a regular file this method will
+///      return nil and fill in an error.
+/// @param fileStat The stat information for the given path
+/// @param error If an error occurred and nil is returned, this will be a pointer to an NSError
+///      describing the problem.
+///
+- (instancetype)initWithResolvedPath:(NSString *)path
+                                stat:(const struct stat *)fileStat
+                               error:(NSError **)error NS_DESIGNATED_INITIALIZER;
+
 ///
 ///  @param path The path of the file this instance is to represent. The path will be
 ///      converted to an absolute, standardized path if it isn't already.
@@ -226,10 +243,23 @@
 @property(readonly) NSFileHandle *fileHandle;
 
 ///
+/// @return The devno/inode pair referred to by this object
+///
+@property(readonly) SantaVnode vnodeId;
+
+///
 ///  @return Returns an instance of MOLCodeSignChecker initialized with the file's binary path.
 ///  Both the MOLCodesignChecker and any resulting NSError are cached and returned on subsequent
 ///  calls.  You may pass in NULL for the error if you don't care to receive it.
 ///
 - (MOLCodesignChecker *)codesignCheckerWithError:(NSError **)error;
 
+///
+/// This method will perform code signature validation on the file's binary path or
+/// use the cached check if already previously performed.
+///
+/// @return Returns the error, if any, encountered when checking the signature of the
+/// file's binary path.
+///
+- (NSError *)codesignError;
 @end
