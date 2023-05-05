@@ -41,14 +41,17 @@ using santa::common::Unit;
 using santa::santad::EventDisposition;
 using santa::santad::Processor;
 using santa::santad::event_providers::AuthResultCache;
+using santa::santad::event_providers::endpoint_security::EnrichedClose;
+using santa::santad::event_providers::endpoint_security::EnrichedFile;
 using santa::santad::event_providers::endpoint_security::EnrichedMessage;
+using santa::santad::event_providers::endpoint_security::EnrichedProcess;
 using santa::santad::event_providers::endpoint_security::Enricher;
 using santa::santad::event_providers::endpoint_security::Message;
 using santa::santad::logs::endpoint_security::Logger;
 
 class MockEnricher : public Enricher {
  public:
-  MOCK_METHOD(std::shared_ptr<EnrichedMessage>, Enrich, (Message &&));
+  MOCK_METHOD(EnrichedMessage, Enrich, (Message &&));
 };
 
 class MockAuthResultCache : public AuthResultCache {
@@ -62,7 +65,7 @@ class MockLogger : public Logger {
  public:
   using Logger::Logger;
 
-  MOCK_METHOD(void, Log, (std::shared_ptr<EnrichedMessage>));
+  MOCK_METHOD(void, Log, (EnrichedMessage));
 };
 
 @interface SNTEndpointSecurityRecorderTest : XCTestCase
@@ -100,10 +103,13 @@ class MockLogger : public Logger {
   mockESApi->SetExpectationsESNewClient();
   mockESApi->SetExpectationsRetainReleaseMessage();
 
-  std::shared_ptr<EnrichedMessage> enrichedMsg = std::shared_ptr<EnrichedMessage>(nullptr);
-
   auto mockEnricher = std::make_shared<MockEnricher>();
-  EXPECT_CALL(*mockEnricher, Enrich).WillOnce(testing::Return(enrichedMsg));
+  EXPECT_CALL(*mockEnricher, Enrich)
+    .WillOnce(testing::Return(EnrichedMessage(
+      EnrichedClose(Message(mockESApi, &esMsg),
+                    EnrichedProcess(std::nullopt, std::nullopt, std::nullopt, std::nullopt,
+                                    EnrichedFile(std::nullopt, std::nullopt, std::nullopt)),
+                    EnrichedFile(std::nullopt, std::nullopt, std::nullopt)))));
 
   auto mockAuthCache = std::make_shared<MockAuthResultCache>(nullptr, nil);
   EXPECT_CALL(*mockAuthCache, RemoveFromCache(&targetFile)).Times(1);

@@ -49,8 +49,7 @@ class Logger {
 
   virtual ~Logger() = default;
 
-  virtual void Log(
-    std::shared_ptr<santa::santad::event_providers::endpoint_security::EnrichedMessage> msg);
+  virtual void Log(santa::santad::event_providers::endpoint_security::EnrichedMessage msg);
 
   void LogAllowlist(const santa::santad::event_providers::endpoint_security::Message &msg,
                     const std::string_view hash);

@@ -71,11 +71,9 @@
                cacheable:(bool)cacheable;
 
 - (void)
-  processEnrichedMessage:
-    (std::shared_ptr<santa::santad::event_providers::endpoint_security::EnrichedMessage>)msg
+  processEnrichedMessage:(santa::santad::event_providers::endpoint_security::EnrichedMessage)msg
                  handler:
-                   (void (^)(std::shared_ptr<
-                             santa::santad::event_providers::endpoint_security::EnrichedMessage>))
+                   (void (^)(santa::santad::event_providers::endpoint_security::EnrichedMessage))
                      messageHandler;
 
 - (void)asynchronouslyProcess:(santa::santad::event_providers::endpoint_security::Message)msg

@@ -36,9 +36,9 @@ class Serializer {
   virtual ~Serializer() = default;
 
   std::vector<uint8_t> SerializeMessage(
-    std::shared_ptr<santa::santad::event_providers::endpoint_security::EnrichedMessage> msg) {
+    santa::santad::event_providers::endpoint_security::EnrichedMessage msg) {
     return std::visit([this](const auto &arg) { return this->SerializeMessageTemplate(arg); },
-                      msg->GetEnrichedMessage());
+                      msg.GetEnrichedMessage());
   }
 
   bool EnabledMachineID();
