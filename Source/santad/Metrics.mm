@@ -27,28 +27,37 @@ static NSString *const kProcessorRecorder = @"Recorder";
 static NSString *const kProcessorTamperResistance = @"TamperResistance";
 static NSString *const kProcessorFileAccessAuthorizer = @"FileAccessAuthorizer";
 
+static NSString *const kEventTypeNotifyClone = @"NotifyClone";
 static NSString *const kEventTypeAuthClone = @"AuthClone";
+static NSString *const kEventTypeNotifyCopyfile = @"NotifyCopyfile";
 static NSString *const kEventTypeAuthCopyfile = @"AuthCopyfile";
+static NSString *const kEventTypeNotifyCreate = @"NotifyCreate";
 static NSString *const kEventTypeAuthCreate = @"AuthCreate";
-static NSString *const kEventTypeAuthExchangedata = @"AuthExchangedata";
-static NSString *const kEventTypeAuthExec = @"AuthExec";
-static NSString *const kEventTypeAuthKextload = @"AuthKextload";
-static NSString *const kEventTypeAuthLink = @"AuthLink";
-static NSString *const kEventTypeAuthMount = @"AuthMount";
-static NSString *const kEventTypeAuthOpen = @"AuthOpen";
-static NSString *const kEventTypeAuthRemount = @"AuthRemount";
-static NSString *const kEventTypeAuthRename = @"AuthRename";
-static NSString *const kEventTypeAuthTruncate = @"AuthTruncate";
-static NSString *const kEventTypeAuthUnlink = @"AuthUnlink";
-static NSString *const kEventTypeNotifyClose = @"NotifyClose";
 static NSString *const kEventTypeNotifyExchangedata = @"NotifyExchangedata";
+static NSString *const kEventTypeAuthExchangedata = @"AuthExchangedata";
 static NSString *const kEventTypeNotifyExec = @"NotifyExec";
+static NSString *const kEventTypeAuthExec = @"AuthExec";
+static NSString *const kEventTypeNotifyLink = @"NotifyLink";
+static NSString *const kEventTypeAuthLink = @"AuthLink";
+static NSString *const kEventTypeNotifyOpen = @"NotifyOpen";
+static NSString *const kEventTypeAuthOpen = @"AuthOpen";
+static NSString *const kEventTypeNotifyRename = @"NotifyRename";
+static NSString *const kEventTypeAuthRename = @"AuthRename";
+static NSString *const kEventTypeNotifyTruncate = @"NotifyTruncate";
+static NSString *const kEventTypeAuthTruncate = @"AuthTruncate";
+static NSString *const kEventTypeNotifyUnlink = @"NotifyUnlink";
+static NSString *const kEventTypeAuthUnlink = @"AuthUnlink";
+
+// Events without AUTH variant
+static NSString *const kEventTypeNotifyClose = @"NotifyClose";
 static NSString *const kEventTypeNotifyExit = @"NotifyExit";
 static NSString *const kEventTypeNotifyFork = @"NotifyFork";
-static NSString *const kEventTypeNotifyLink = @"NotifyLink";
-static NSString *const kEventTypeNotifyRename = @"NotifyRename";
-static NSString *const kEventTypeNotifyUnlink = @"NotifyUnlink";
 static NSString *const kEventTypeNotifyUnmount = @"NotifyUnmount";
+
+// Events where only AUTH is subscribed
+static NSString *const kEventTypeAuthKextload = @"AuthKextload";
+static NSString *const kEventTypeAuthMount = @"AuthMount";
+static NSString *const kEventTypeAuthRemount = @"AuthRemount";
 
 static NSString *const kEventDispositionDropped = @"Dropped";
 static NSString *const kEventDispositionProcessed = @"Processed";
@@ -70,28 +79,38 @@ NSString *const ProcessorToString(Processor processor) {
 
 NSString *const EventTypeToString(es_event_type_t eventType) {
   switch (eventType) {
+    case ES_EVENT_TYPE_NOTIFY_CLONE: return kEventTypeNotifyClone;
     case ES_EVENT_TYPE_AUTH_CLONE: return kEventTypeAuthClone;
+    case ES_EVENT_TYPE_NOTIFY_COPYFILE: return kEventTypeNotifyCopyfile;
     case ES_EVENT_TYPE_AUTH_COPYFILE: return kEventTypeAuthCopyfile;
+    case ES_EVENT_TYPE_NOTIFY_CREATE: return kEventTypeNotifyCreate;
     case ES_EVENT_TYPE_AUTH_CREATE: return kEventTypeAuthCreate;
-    case ES_EVENT_TYPE_AUTH_EXCHANGEDATA: return kEventTypeAuthExchangedata;
-    case ES_EVENT_TYPE_AUTH_EXEC: return kEventTypeAuthExec;
-    case ES_EVENT_TYPE_AUTH_KEXTLOAD: return kEventTypeAuthKextload;
-    case ES_EVENT_TYPE_AUTH_LINK: return kEventTypeAuthLink;
-    case ES_EVENT_TYPE_AUTH_MOUNT: return kEventTypeAuthMount;
-    case ES_EVENT_TYPE_AUTH_OPEN: return kEventTypeAuthOpen;
-    case ES_EVENT_TYPE_AUTH_REMOUNT: return kEventTypeAuthRemount;
-    case ES_EVENT_TYPE_AUTH_RENAME: return kEventTypeAuthRename;
-    case ES_EVENT_TYPE_AUTH_TRUNCATE: return kEventTypeAuthTruncate;
-    case ES_EVENT_TYPE_AUTH_UNLINK: return kEventTypeAuthUnlink;
-    case ES_EVENT_TYPE_NOTIFY_CLOSE: return kEventTypeNotifyClose;
     case ES_EVENT_TYPE_NOTIFY_EXCHANGEDATA: return kEventTypeNotifyExchangedata;
+    case ES_EVENT_TYPE_AUTH_EXCHANGEDATA: return kEventTypeAuthExchangedata;
     case ES_EVENT_TYPE_NOTIFY_EXEC: return kEventTypeNotifyExec;
+    case ES_EVENT_TYPE_AUTH_EXEC: return kEventTypeAuthExec;
+    case ES_EVENT_TYPE_NOTIFY_LINK: return kEventTypeNotifyLink;
+    case ES_EVENT_TYPE_AUTH_LINK: return kEventTypeAuthLink;
+    case ES_EVENT_TYPE_NOTIFY_OPEN: return kEventTypeNotifyOpen;
+    case ES_EVENT_TYPE_AUTH_OPEN: return kEventTypeAuthOpen;
+    case ES_EVENT_TYPE_NOTIFY_RENAME: return kEventTypeNotifyRename;
+    case ES_EVENT_TYPE_AUTH_RENAME: return kEventTypeAuthRename;
+    case ES_EVENT_TYPE_NOTIFY_TRUNCATE: return kEventTypeNotifyTruncate;
+    case ES_EVENT_TYPE_AUTH_TRUNCATE: return kEventTypeAuthTruncate;
+    case ES_EVENT_TYPE_NOTIFY_UNLINK: return kEventTypeNotifyUnlink;
+    case ES_EVENT_TYPE_AUTH_UNLINK: return kEventTypeAuthUnlink;
+
+    // Events without AUTH variant
+    case ES_EVENT_TYPE_NOTIFY_CLOSE: return kEventTypeNotifyClose;
     case ES_EVENT_TYPE_NOTIFY_EXIT: return kEventTypeNotifyExit;
     case ES_EVENT_TYPE_NOTIFY_FORK: return kEventTypeNotifyFork;
-    case ES_EVENT_TYPE_NOTIFY_LINK: return kEventTypeNotifyLink;
-    case ES_EVENT_TYPE_NOTIFY_RENAME: return kEventTypeNotifyRename;
-    case ES_EVENT_TYPE_NOTIFY_UNLINK: return kEventTypeNotifyUnlink;
     case ES_EVENT_TYPE_NOTIFY_UNMOUNT: return kEventTypeNotifyUnmount;
+
+    // Events where only AUTH is subscribed
+    case ES_EVENT_TYPE_AUTH_KEXTLOAD: return kEventTypeAuthKextload;
+    case ES_EVENT_TYPE_AUTH_MOUNT: return kEventTypeAuthMount;
+    case ES_EVENT_TYPE_AUTH_REMOUNT: return kEventTypeAuthRemount;
+
     default:
       [NSException raise:@"Invalid event type" format:@"Invalid event type: %d", eventType];
       return nil;

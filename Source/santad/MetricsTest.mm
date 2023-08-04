@@ -136,27 +136,37 @@ using santa::santad::ProcessorToString;
 
 - (void)testEventTypeToString {
   std::map<es_event_type_t, NSString *> eventTypeToString = {
+    {ES_EVENT_TYPE_NOTIFY_CLONE, @"NotifyClone"},
     {ES_EVENT_TYPE_AUTH_CLONE, @"AuthClone"},
+    {ES_EVENT_TYPE_NOTIFY_COPYFILE, @"NotifyCopyfile"},
     {ES_EVENT_TYPE_AUTH_COPYFILE, @"AuthCopyfile"},
+    {ES_EVENT_TYPE_NOTIFY_CREATE, @"NotifyCreate"},
     {ES_EVENT_TYPE_AUTH_CREATE, @"AuthCreate"},
-    {ES_EVENT_TYPE_AUTH_EXCHANGEDATA, @"AuthExchangedata"},
-    {ES_EVENT_TYPE_AUTH_EXEC, @"AuthExec"},
-    {ES_EVENT_TYPE_AUTH_KEXTLOAD, @"AuthKextload"},
-    {ES_EVENT_TYPE_AUTH_LINK, @"AuthLink"},
-    {ES_EVENT_TYPE_AUTH_MOUNT, @"AuthMount"},
-    {ES_EVENT_TYPE_AUTH_REMOUNT, @"AuthRemount"},
-    {ES_EVENT_TYPE_AUTH_RENAME, @"AuthRename"},
-    {ES_EVENT_TYPE_AUTH_TRUNCATE, @"AuthTruncate"},
-    {ES_EVENT_TYPE_AUTH_UNLINK, @"AuthUnlink"},
-    {ES_EVENT_TYPE_NOTIFY_CLOSE, @"NotifyClose"},
     {ES_EVENT_TYPE_NOTIFY_EXCHANGEDATA, @"NotifyExchangedata"},
+    {ES_EVENT_TYPE_AUTH_EXCHANGEDATA, @"AuthExchangedata"},
     {ES_EVENT_TYPE_NOTIFY_EXEC, @"NotifyExec"},
+    {ES_EVENT_TYPE_AUTH_EXEC, @"AuthExec"},
+    {ES_EVENT_TYPE_NOTIFY_LINK, @"NotifyLink"},
+    {ES_EVENT_TYPE_AUTH_LINK, @"AuthLink"},
+    {ES_EVENT_TYPE_NOTIFY_OPEN, @"NotifyOpen"},
+    {ES_EVENT_TYPE_AUTH_OPEN, @"AuthOpen"},
+    {ES_EVENT_TYPE_NOTIFY_RENAME, @"NotifyRename"},
+    {ES_EVENT_TYPE_AUTH_RENAME, @"AuthRename"},
+    {ES_EVENT_TYPE_NOTIFY_TRUNCATE, @"NotifyTruncate"},
+    {ES_EVENT_TYPE_AUTH_TRUNCATE, @"AuthTruncate"},
+    {ES_EVENT_TYPE_NOTIFY_UNLINK, @"NotifyUnlink"},
+    {ES_EVENT_TYPE_AUTH_UNLINK, @"AuthUnlink"},
+
+    // Events without AUTH variant
+    {ES_EVENT_TYPE_NOTIFY_CLOSE, @"NotifyClose"},
     {ES_EVENT_TYPE_NOTIFY_EXIT, @"NotifyExit"},
     {ES_EVENT_TYPE_NOTIFY_FORK, @"NotifyFork"},
-    {ES_EVENT_TYPE_NOTIFY_LINK, @"NotifyLink"},
-    {ES_EVENT_TYPE_NOTIFY_RENAME, @"NotifyRename"},
-    {ES_EVENT_TYPE_NOTIFY_UNLINK, @"NotifyUnlink"},
     {ES_EVENT_TYPE_NOTIFY_UNMOUNT, @"NotifyUnmount"},
+
+    // Events where only AUTH is subscribed
+    {ES_EVENT_TYPE_AUTH_KEXTLOAD, @"AuthKextload"},
+    {ES_EVENT_TYPE_AUTH_MOUNT, @"AuthMount"},
+    {ES_EVENT_TYPE_AUTH_REMOUNT, @"AuthRemount"},
   };
 
   for (const auto &kv : eventTypeToString) {
