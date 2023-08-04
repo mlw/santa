@@ -27,11 +27,13 @@
 #include <variant>
 #include <vector>
 
+#import "Source/common/PrefixTree.h"
 #include "Source/common/TestUtils.h"
 #import "Source/common/Unit.h"
 #include "Source/santad/DataLayer/WatchItemPolicy.h"
 #include "Source/santad/DataLayer/WatchItems.h"
 
+using santa::common::PrefixTree;
 using santa::common::Unit;
 using santa::santad::data_layer::kWatchItemPolicyDefaultAllowReadAccess;
 using santa::santad::data_layer::kWatchItemPolicyDefaultAuditOnly;
@@ -64,6 +66,7 @@ class WatchItemsPeer : public WatchItems {
  public:
   using WatchItems::WatchItems;
 
+  using WatchItems::BuildPolicyTree;
   using WatchItems::ReloadConfig;
   using WatchItems::SetConfig;
   using WatchItems::SetConfigPath;
@@ -909,6 +912,42 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
 
   XCTAssertNil(watchItems.config_path_);
   XCTAssertNotNil(watchItems.embedded_config_);
+}
+
+- (void)testBuildPolicyTree {
+  std::vector<std::shared_ptr<WatchItemPolicy>> policies = {};
+  WatchItemsPeer watchItems((NSString *)nil, NULL, NULL);
+  auto tree = std::make_unique<PrefixTree<std::shared_ptr<WatchItemPolicy>>>();
+  std::set<std::pair<std::string, WatchItemPathType>> paths;
+
+  bool auditOnly;
+
+  // When no policies exist, auditOnly is true
+  auditOnly = false;
+  watchItems.BuildPolicyTree(policies, *tree, paths, &auditOnly);
+  XCTAssertTrue(auditOnly);
+
+  // When all policies are audit only, auditOnly is true
+  policies = {std::make_shared<WatchItemPolicy>("name1", "path1", WatchItemPathType::kLiteral,
+                                                false, true /* audit_only */),
+              std::make_shared<WatchItemPolicy>("name2", "path2", WatchItemPathType::kLiteral,
+                                                false, true /* audit_only */),
+              std::make_shared<WatchItemPolicy>("name3", "path3", WatchItemPathType::kLiteral,
+                                                false, true /* audit_only */)};
+  auditOnly = false;
+  watchItems.BuildPolicyTree(policies, *tree, paths, &auditOnly);
+  XCTAssertTrue(auditOnly);
+
+  // When some policies are not audit only, auditOnly is false
+  policies = {std::make_shared<WatchItemPolicy>("name1", "path1", WatchItemPathType::kLiteral,
+                                                false, true /* audit_only */),
+              std::make_shared<WatchItemPolicy>("name2", "path2", WatchItemPathType::kLiteral,
+                                                false, false /* audit_only */),
+              std::make_shared<WatchItemPolicy>("name3", "path3", WatchItemPathType::kLiteral,
+                                                false, true /* audit_only */)};
+  auditOnly = true;
+  watchItems.BuildPolicyTree(policies, *tree, paths, &auditOnly);
+  XCTAssertFalse(auditOnly);
 }
 
 @end

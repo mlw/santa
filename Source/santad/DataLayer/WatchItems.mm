@@ -626,9 +626,14 @@ WatchItems::~WatchItems() {
 
 bool WatchItems::BuildPolicyTree(const std::vector<std::shared_ptr<WatchItemPolicy>> &watch_items,
                                  PrefixTree<std::shared_ptr<WatchItemPolicy>> &tree,
-                                 std::set<std::pair<std::string, WatchItemPathType>> &paths) {
+                                 std::set<std::pair<std::string, WatchItemPathType>> &paths,
+                                 bool *audit_only) {
+  bool audit_only_state = true;
   glob_t *g = (glob_t *)alloca(sizeof(glob_t));
   for (const std::shared_ptr<WatchItemPolicy> &item : watch_items) {
+
+    audit_only_state = (audit_only_state && item->audit_only);
+
     int err = glob(item->path.c_str(), 0, nullptr, g);
     if (err != 0 && err != GLOB_NOMATCH) {
       LOGE(@"Failed to generate path names for watch item: %s", item->name.c_str());
@@ -647,6 +652,10 @@ bool WatchItems::BuildPolicyTree(const std::vector<std::shared_ptr<WatchItemPoli
     globfree(g);
   }
 
+  if (audit_only) {
+    *audit_only = audit_only_state;
+  }
+
   return true;
 }
 
@@ -658,7 +667,7 @@ void WatchItems::RegisterClient(id<SNTEndpointSecurityDynamicEventHandler> clien
 void WatchItems::UpdateCurrentState(
   std::unique_ptr<PrefixTree<std::shared_ptr<WatchItemPolicy>>> new_tree,
   std::set<std::pair<std::string, WatchItemPathType>> &&new_monitored_paths,
-  NSDictionary *new_config) {
+  NSDictionary *new_config, bool audit_only) {
   absl::MutexLock lock(&lock_);
 
   // The following conditions require updating the current config:
@@ -704,7 +713,8 @@ void WatchItems::UpdateCurrentState(
       dispatch_async(q_, ^{
         [client watchItemsCount:currently_monitored_paths_.size()
                        newPaths:paths_to_watch
-                   removedPaths:paths_to_stop_watching];
+                   removedPaths:paths_to_stop_watching
+                      auditOnly:audit_only];
       });
     }
   } else {
@@ -716,6 +726,7 @@ void WatchItems::ReloadConfig(NSDictionary *new_config) {
   std::vector<std::shared_ptr<WatchItemPolicy>> new_policies;
   auto new_tree = std::make_unique<PrefixTree<std::shared_ptr<WatchItemPolicy>>>();
   std::set<std::pair<std::string, WatchItemPathType>> new_monitored_paths;
+  bool audit_only = true;
 
   if (new_config) {
     NSError *err;
@@ -725,13 +736,13 @@ void WatchItems::ReloadConfig(NSDictionary *new_config) {
       return;
     }
 
-    if (!BuildPolicyTree(new_policies, *new_tree, new_monitored_paths)) {
+    if (!BuildPolicyTree(new_policies, *new_tree, new_monitored_paths, &audit_only)) {
       LOGE(@"Failed to build new filesystem monitoring policy");
       return;
     }
   }
 
-  UpdateCurrentState(std::move(new_tree), std::move(new_monitored_paths), new_config);
+  UpdateCurrentState(std::move(new_tree), std::move(new_monitored_paths), new_config, audit_only);
 }
 
 NSDictionary *WatchItems::ReadConfig() {

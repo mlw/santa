@@ -107,10 +107,11 @@ class WatchItems : public std::enable_shared_from_this<WatchItems> {
   void ReloadConfig(NSDictionary *new_config);
   void UpdateCurrentState(std::unique_ptr<WatchItemsTree> new_tree,
                           std::set<std::pair<std::string, WatchItemPathType>> &&new_monitored_paths,
-                          NSDictionary *new_config);
+                          NSDictionary *new_config, bool audit_only);
   bool BuildPolicyTree(const std::vector<std::shared_ptr<WatchItemPolicy>> &watch_items,
                        WatchItemsTree &tree,
-                       std::set<std::pair<std::string, WatchItemPathType>> &paths);
+                       std::set<std::pair<std::string, WatchItemPathType>> &paths,
+                       bool *audit_only);
 
   NSString *config_path_;
   NSDictionary *embedded_config_;

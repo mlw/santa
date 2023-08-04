@@ -50,6 +50,7 @@
               &)newPaths
      removedPaths:
        (const std::vector<std::pair<std::string, santa::santad::data_layer::WatchItemPathType>> &)
-         removedPaths;
+         removedPaths
+        auditOnly:(bool)auditOnly;
 
 @end

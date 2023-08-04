@@ -87,6 +87,8 @@ void ClearWatchItemPolicyProcess(WatchItemPolicy::Process &proc) {
                               toMessage:(const Message &)msg;
 
 @property bool isSubscribed;
+@property bool isSubscribedAuditOnly;
+@property bool isPolicyAuditOnly;
 @end
 
 @interface SNTEndpointSecurityFileAccessAuthorizerTest : XCTestCase
@@ -678,12 +680,61 @@ void ClearWatchItemPolicyProcess(WatchItemPolicy::Process &proc) {
              .WillOnce(testing::Return(true)))
     .WillOnce(testing::Return(true));
 
-  id fileAccessClient = [[SNTEndpointSecurityFileAccessAuthorizer alloc]
-    initWithESAPI:mockESApi
-          metrics:nullptr
-        processor:santa::santad::Processor::kFileAccessAuthorizer];
+  SNTEndpointSecurityFileAccessAuthorizer *fileAccessClient =
+    [[SNTEndpointSecurityFileAccessAuthorizer alloc]
+      initWithESAPI:mockESApi
+            metrics:nullptr
+          processor:santa::santad::Processor::kFileAccessAuthorizer];
+
+  XCTAssertFalse(fileAccessClient.isSubscribed);
+  XCTAssertFalse(fileAccessClient.isSubscribedAuditOnly);
 
   [fileAccessClient enable];
+
+  XCTAssertTrue(fileAccessClient.isSubscribed);
+  XCTAssertFalse(fileAccessClient.isSubscribedAuditOnly);
+
+  XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
+}
+
+- (void)testEnableAuditOnly {
+  std::set<es_event_type_t> expectedEventSubs = {
+    ES_EVENT_TYPE_NOTIFY_CLONE,    ES_EVENT_TYPE_NOTIFY_CREATE, ES_EVENT_TYPE_NOTIFY_EXCHANGEDATA,
+    ES_EVENT_TYPE_NOTIFY_LINK,     ES_EVENT_TYPE_NOTIFY_OPEN,   ES_EVENT_TYPE_NOTIFY_RENAME,
+    ES_EVENT_TYPE_NOTIFY_TRUNCATE, ES_EVENT_TYPE_NOTIFY_UNLINK,
+  };
+
+#if HAVE_MACOS_12
+  if (@available(macOS 12.0, *)) {
+    expectedEventSubs.insert(ES_EVENT_TYPE_NOTIFY_COPYFILE);
+  }
+#endif
+
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  EXPECT_CALL(*mockESApi, ClearCache)
+    .After(EXPECT_CALL(*mockESApi, Subscribe(testing::_, expectedEventSubs))
+             .WillOnce(testing::Return(true)))
+    .WillOnce(testing::Return(true));
+
+  SNTEndpointSecurityFileAccessAuthorizer *fileAccessClient =
+    [[SNTEndpointSecurityFileAccessAuthorizer alloc]
+      initWithESAPI:mockESApi
+            metrics:nullptr
+          processor:santa::santad::Processor::kFileAccessAuthorizer];
+
+  id accessClientMock = OCMPartialMock(fileAccessClient);
+
+  OCMExpect([accessClientMock unsubscribeAll]).andReturn(true);
+
+  fileAccessClient.isPolicyAuditOnly = YES;
+
+  XCTAssertFalse(fileAccessClient.isSubscribed);
+  XCTAssertFalse(fileAccessClient.isSubscribedAuditOnly);
+
+  [fileAccessClient enable];
+
+  XCTAssertTrue(fileAccessClient.isSubscribed);
+  XCTAssertTrue(fileAccessClient.isSubscribedAuditOnly);
 
   XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
 }

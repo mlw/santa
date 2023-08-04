@@ -19,6 +19,7 @@
 #import <MOLCertificate/MOLCertificate.h>
 #import <MOLCodesignChecker/MOLCodesignChecker.h>
 #include <bsm/libbsm.h>
+#include <os/base.h>
 #include <sys/fcntl.h>
 
 #include <algorithm>
@@ -132,11 +133,13 @@ es_auth_result_t CombinePolicyResults(es_auth_result_t result1, es_auth_result_t
 
 void PopulatePathTargets(const Message &msg, std::vector<PathTarget> &targets) {
   switch (msg->event_type) {
+    case ES_EVENT_TYPE_NOTIFY_CLONE: OS_FALLTHROUGH;
     case ES_EVENT_TYPE_AUTH_CLONE:
       PushBackIfNotTruncated(targets, msg->event.clone.source, true);
       PushBackIfNotTruncated(targets, msg->event.clone.target_dir, msg->event.clone.target_name);
       break;
 
+    case ES_EVENT_TYPE_NOTIFY_CREATE: OS_FALLTHROUGH;
     case ES_EVENT_TYPE_AUTH_CREATE:
       // AUTH CREATE events should always be ES_DESTINATION_TYPE_NEW_PATH
       if (msg->event.create.destination_type == ES_DESTINATION_TYPE_NEW_PATH) {
@@ -148,6 +151,7 @@ void PopulatePathTargets(const Message &msg, std::vector<PathTarget> &targets) {
       }
       break;
 
+    case ES_EVENT_TYPE_NOTIFY_COPYFILE: OS_FALLTHROUGH;
     case ES_EVENT_TYPE_AUTH_COPYFILE:
       PushBackIfNotTruncated(targets, msg->event.copyfile.source, true);
       if (msg->event.copyfile.target_file) {
@@ -158,20 +162,24 @@ void PopulatePathTargets(const Message &msg, std::vector<PathTarget> &targets) {
       }
       break;
 
+    case ES_EVENT_TYPE_NOTIFY_EXCHANGEDATA: OS_FALLTHROUGH;
     case ES_EVENT_TYPE_AUTH_EXCHANGEDATA:
       PushBackIfNotTruncated(targets, msg->event.exchangedata.file1);
       PushBackIfNotTruncated(targets, msg->event.exchangedata.file2);
       break;
 
+    case ES_EVENT_TYPE_NOTIFY_LINK: OS_FALLTHROUGH;
     case ES_EVENT_TYPE_AUTH_LINK:
       PushBackIfNotTruncated(targets, msg->event.link.source);
       PushBackIfNotTruncated(targets, msg->event.link.target_dir, msg->event.link.target_filename);
       break;
 
+    case ES_EVENT_TYPE_NOTIFY_OPEN: OS_FALLTHROUGH;
     case ES_EVENT_TYPE_AUTH_OPEN:
       PushBackIfNotTruncated(targets, msg->event.open.file, true);
       break;
 
+    case ES_EVENT_TYPE_NOTIFY_RENAME: OS_FALLTHROUGH;
     case ES_EVENT_TYPE_AUTH_RENAME:
       PushBackIfNotTruncated(targets, msg->event.rename.source);
       if (msg->event.rename.destination_type == ES_DESTINATION_TYPE_EXISTING_FILE) {
@@ -185,10 +193,12 @@ void PopulatePathTargets(const Message &msg, std::vector<PathTarget> &targets) {
       }
       break;
 
+    case ES_EVENT_TYPE_NOTIFY_TRUNCATE: OS_FALLTHROUGH;
     case ES_EVENT_TYPE_AUTH_TRUNCATE:
       PushBackIfNotTruncated(targets, msg->event.truncate.target);
       break;
 
+    case ES_EVENT_TYPE_NOTIFY_UNLINK: OS_FALLTHROUGH;
     case ES_EVENT_TYPE_AUTH_UNLINK:
       PushBackIfNotTruncated(targets, msg->event.unlink.target);
       break;
@@ -204,6 +214,8 @@ void PopulatePathTargets(const Message &msg, std::vector<PathTarget> &targets) {
 @interface SNTEndpointSecurityFileAccessAuthorizer ()
 @property SNTDecisionCache *decisionCache;
 @property bool isSubscribed;
+@property bool isSubscribedAuditOnly;
+@property bool isPolicyAuditOnly;
 @end
 
 @implementation SNTEndpointSecurityFileAccessAuthorizer {
@@ -298,6 +310,7 @@ void PopulatePathTargets(const Message &msg, std::vector<PathTarget> &targets) {
                                           target:(const PathTarget &)target
                                          message:(const Message &)msg {
   switch (msg->event_type) {
+    case ES_EVENT_TYPE_NOTIFY_OPEN: OS_FALLTHROUGH;
     case ES_EVENT_TYPE_AUTH_OPEN:
       // If the policy is write-only, but the operation isn't a write action, it's allowed
       if (policy->allow_read_access && !(msg->event.open.fflag & kOpenFlagsIndicatingWrite)) {
@@ -305,6 +318,7 @@ void PopulatePathTargets(const Message &msg, std::vector<PathTarget> &targets) {
       }
       break;
 
+    case ES_EVENT_TYPE_NOTIFY_CLONE: OS_FALLTHROUGH;
     case ES_EVENT_TYPE_AUTH_CLONE:
       // If policy is write-only, readable targets are allowed (e.g. source file)
       if (policy->allow_read_access && target.isReadable) {
@@ -312,6 +326,7 @@ void PopulatePathTargets(const Message &msg, std::vector<PathTarget> &targets) {
       }
       break;
 
+    case ES_EVENT_TYPE_NOTIFY_COPYFILE: OS_FALLTHROUGH;
     case ES_EVENT_TYPE_AUTH_COPYFILE:
       // Note: Flags for the copyfile event represent the kernel view, not the usersapce
       // copyfile(3) implementation. This means if a `copyfile(3)` flag like `COPYFILE_MOVE`
@@ -321,11 +336,17 @@ void PopulatePathTargets(const Message &msg, std::vector<PathTarget> &targets) {
       }
       break;
 
-    case ES_EVENT_TYPE_AUTH_CREATE:
-    case ES_EVENT_TYPE_AUTH_EXCHANGEDATA:
-    case ES_EVENT_TYPE_AUTH_LINK:
-    case ES_EVENT_TYPE_AUTH_RENAME:
-    case ES_EVENT_TYPE_AUTH_TRUNCATE:
+    case ES_EVENT_TYPE_NOTIFY_CREATE: OS_FALLTHROUGH;
+    case ES_EVENT_TYPE_AUTH_CREATE: OS_FALLTHROUGH;
+    case ES_EVENT_TYPE_NOTIFY_EXCHANGEDATA: OS_FALLTHROUGH;
+    case ES_EVENT_TYPE_AUTH_EXCHANGEDATA: OS_FALLTHROUGH;
+    case ES_EVENT_TYPE_NOTIFY_LINK: OS_FALLTHROUGH;
+    case ES_EVENT_TYPE_AUTH_LINK: OS_FALLTHROUGH;
+    case ES_EVENT_TYPE_NOTIFY_RENAME: OS_FALLTHROUGH;
+    case ES_EVENT_TYPE_AUTH_RENAME: OS_FALLTHROUGH;
+    case ES_EVENT_TYPE_NOTIFY_TRUNCATE: OS_FALLTHROUGH;
+    case ES_EVENT_TYPE_AUTH_TRUNCATE: OS_FALLTHROUGH;
+    case ES_EVENT_TYPE_NOTIFY_UNLINK: OS_FALLTHROUGH;
     case ES_EVENT_TYPE_AUTH_UNLINK:
       // These event types have no special case
       break;
@@ -555,13 +576,15 @@ void PopulatePathTargets(const Message &msg, std::vector<PathTarget> &targets) {
     }
   }
 
-  // IMPORTANT: A response is only cacheable if the policy result was explicitly
-  // allowed. An "allow read access" result must not be cached to ensure a future
-  // non-read accesss can be evaluated. Similarly, denied results must never be
-  // cached so access attempts can be logged.
-  [self respondToMessage:msg
-          withAuthResult:policyResult
-               cacheable:(policyResult == ES_AUTH_RESULT_ALLOW && !allow_read_access)];
+  if (msg->action_type == ES_ACTION_TYPE_AUTH) {
+    // IMPORTANT: A response is only cacheable if the policy result was explicitly
+    // allowed. An "allow read access" result must not be cached to ensure a future
+    // non-read accesss can be evaluated. Similarly, denied results must never be
+    // cached so access attempts can be logged.
+    [self respondToMessage:msg
+            withAuthResult:policyResult
+                 cacheable:(policyResult == ES_AUTH_RESULT_ALLOW && !allow_read_access)];
+  }
 }
 
 - (void)handleMessage:(santa::santad::event_providers::endpoint_security::Message &&)esMsg
@@ -580,15 +603,29 @@ void PopulatePathTargets(const Message &msg, std::vector<PathTarget> &targets) {
     ES_EVENT_TYPE_AUTH_TRUNCATE, ES_EVENT_TYPE_AUTH_UNLINK,
   };
 
+  std::set<es_event_type_t> auditOnlyEvents = {
+    ES_EVENT_TYPE_NOTIFY_CLONE,    ES_EVENT_TYPE_NOTIFY_CREATE, ES_EVENT_TYPE_NOTIFY_EXCHANGEDATA,
+    ES_EVENT_TYPE_NOTIFY_LINK,     ES_EVENT_TYPE_NOTIFY_OPEN,   ES_EVENT_TYPE_NOTIFY_RENAME,
+    ES_EVENT_TYPE_NOTIFY_TRUNCATE, ES_EVENT_TYPE_NOTIFY_UNLINK,
+  };
+
 #if HAVE_MACOS_12
   if (@available(macOS 12.0, *)) {
     events.insert(ES_EVENT_TYPE_AUTH_COPYFILE);
+    auditOnlyEvents.insert(ES_EVENT_TYPE_NOTIFY_COPYFILE);
   }
 #endif
 
+  if (self.isPolicyAuditOnly != self.isSubscribedAuditOnly) {
+    [self unsubscribeAll];
+  }
+
   if (!self.isSubscribed) {
-    if ([super subscribe:events]) {
+    const std::set<es_event_type_t> &eventSubscriptions =
+      self.isPolicyAuditOnly ? auditOnlyEvents : events;
+    if ([super subscribe:eventSubscriptions]) {
       self.isSubscribed = true;
+      self.isSubscribedAuditOnly = self.isPolicyAuditOnly;
     }
   }
 
@@ -596,19 +633,25 @@ void PopulatePathTargets(const Message &msg, std::vector<PathTarget> &targets) {
   [super clearCache];
 }
 
+- (bool)unsubscribeAll {
+  bool success = [super unsubscribeAll];
+  if (success) {
+    self.isSubscribed = false;
+  }
+  return success;
+}
+
 - (void)disable {
   if (self.isSubscribed) {
-    if ([super unsubscribeAll]) {
-      self.isSubscribed = false;
-    }
+    [self unsubscribeAll];
     [super unmuteAllTargetPaths];
   }
 }
 
 - (void)watchItemsCount:(size_t)count
                newPaths:(const std::vector<std::pair<std::string, WatchItemPathType>> &)newPaths
-           removedPaths:
-             (const std::vector<std::pair<std::string, WatchItemPathType>> &)removedPaths {
+           removedPaths:(const std::vector<std::pair<std::string, WatchItemPathType>> &)removedPaths
+              auditOnly:(bool)auditOnly {
   if (count == 0) {
     [self disable];
   } else {
@@ -617,6 +660,8 @@ void PopulatePathTargets(const Message &msg, std::vector<PathTarget> &targets) {
 
     // Begin watching the added paths
     [super muteTargetPaths:newPaths];
+
+    self.isPolicyAuditOnly = auditOnly;
 
     // begin receiving events (if not already)
     [self enable];
