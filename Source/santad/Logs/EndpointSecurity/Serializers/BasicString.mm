@@ -18,6 +18,7 @@
 #include <bsm/libbsm.h>
 #include <libgen.h>
 #include <mach/message.h>
+#include <os/base.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/kauth.h>
@@ -114,14 +115,23 @@ std::string GetModeString(SNTClientMode mode) {
 
 std::string GetAccessTypeString(es_event_type_t event_type) {
   switch (event_type) {
+    case ES_EVENT_TYPE_NOTIFY_CLONE: OS_FALLTHROUGH;
     case ES_EVENT_TYPE_AUTH_CLONE: return "CLONE";
+    case ES_EVENT_TYPE_NOTIFY_COPYFILE: OS_FALLTHROUGH;
     case ES_EVENT_TYPE_AUTH_COPYFILE: return "COPYFILE";
+    case ES_EVENT_TYPE_NOTIFY_CREATE: OS_FALLTHROUGH;
     case ES_EVENT_TYPE_AUTH_CREATE: return "CREATE";
+    case ES_EVENT_TYPE_NOTIFY_EXCHANGEDATA: OS_FALLTHROUGH;
     case ES_EVENT_TYPE_AUTH_EXCHANGEDATA: return "EXCHANGEDATA";
+    case ES_EVENT_TYPE_NOTIFY_LINK: OS_FALLTHROUGH;
     case ES_EVENT_TYPE_AUTH_LINK: return "LINK";
+    case ES_EVENT_TYPE_NOTIFY_OPEN: OS_FALLTHROUGH;
     case ES_EVENT_TYPE_AUTH_OPEN: return "OPEN";
+    case ES_EVENT_TYPE_NOTIFY_RENAME: OS_FALLTHROUGH;
     case ES_EVENT_TYPE_AUTH_RENAME: return "RENAME";
+    case ES_EVENT_TYPE_NOTIFY_TRUNCATE: OS_FALLTHROUGH;
     case ES_EVENT_TYPE_AUTH_TRUNCATE: return "TRUNCATE";
+    case ES_EVENT_TYPE_NOTIFY_UNLINK: OS_FALLTHROUGH;
     case ES_EVENT_TYPE_AUTH_UNLINK: return "UNLINK";
     default: return "UNKNOWN_TYPE_" + std::to_string(event_type);
   }

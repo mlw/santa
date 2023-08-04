@@ -141,10 +141,11 @@ void PopulatePathTargets(const Message &msg, std::vector<PathTarget> &targets) {
 
     case ES_EVENT_TYPE_NOTIFY_CREATE: OS_FALLTHROUGH;
     case ES_EVENT_TYPE_AUTH_CREATE:
-      // AUTH CREATE events should always be ES_DESTINATION_TYPE_NEW_PATH
       if (msg->event.create.destination_type == ES_DESTINATION_TYPE_NEW_PATH) {
         PushBackIfNotTruncated(targets, msg->event.create.destination.new_path.dir,
                                msg->event.create.destination.new_path.filename);
+      } else if (msg->event.create.destination_type == ES_DESTINATION_TYPE_EXISTING_FILE) {
+        PushBackIfNotTruncated(targets, msg->event.create.destination.existing_file);
       } else {
         LOGW(@"Unexpected destination type for create event: %d. Ignoring target.",
              msg->event.create.destination_type);
@@ -589,11 +590,19 @@ void PopulatePathTargets(const Message &msg, std::vector<PathTarget> &targets) {
 
 - (void)handleMessage:(santa::santad::event_providers::endpoint_security::Message &&)esMsg
    recordEventMetrics:(void (^)(EventDisposition))recordEventMetrics {
-  [self processMessage:std::move(esMsg)
-               handler:^(const Message &msg) {
-                 [self processMessage:msg];
-                 recordEventMetrics(EventDisposition::kProcessed);
-               }];
+  if (esMsg->action_type == ES_ACTION_TYPE_AUTH) {
+    [self processMessage:std::move(esMsg)
+                 handler:^(const Message &msg) {
+                   [self processMessage:msg];
+                   recordEventMetrics(EventDisposition::kProcessed);
+                 }];
+  } else {
+    [self asynchronouslyProcess:esMsg
+                        handler:^(Message &&msg) {
+                          [self processMessage:msg];
+                          recordEventMetrics(EventDisposition::kProcessed);
+                        }];
+  }
 }
 
 - (void)enable {

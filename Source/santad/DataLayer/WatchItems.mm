@@ -631,7 +631,6 @@ bool WatchItems::BuildPolicyTree(const std::vector<std::shared_ptr<WatchItemPoli
   bool audit_only_state = true;
   glob_t *g = (glob_t *)alloca(sizeof(glob_t));
   for (const std::shared_ptr<WatchItemPolicy> &item : watch_items) {
-
     audit_only_state = (audit_only_state && item->audit_only);
 
     int err = glob(item->path.c_str(), 0, nullptr, g);
