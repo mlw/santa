@@ -281,11 +281,19 @@ message Execution {
   optional string explain = 13;
 
   // Information known to LaunchServices about the target executable file
-  optional string quarantine_url = 14;
+  // DEPRECATED
+  // This data was previously obtained from the LaunchServices database which
+  // stopped populating the field in macOS 12.4.
+  optional string quarantine_url = 14 [deprecated = true];
 
   // The original path on disk of the target executable
   // Applies when executables are translocated
   optional string original_path = 15;
+
+  // List of information contained within the extended attribute
+  // `com.apple.metadata:kMDItemWhereFroms`. This is typically populated by
+  // major browsers with source and origin URL information.
+  repeated bytes where_froms = 16;
 }
 
 // Information about a fork event

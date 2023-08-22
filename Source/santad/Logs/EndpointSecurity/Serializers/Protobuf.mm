@@ -66,6 +66,9 @@ using santa::santad::logs::endpoint_security::serializers::Utilities::Pidversion
 using santa::santad::logs::endpoint_security::serializers::Utilities::RealGroup;
 using santa::santad::logs::endpoint_security::serializers::Utilities::RealUser;
 
+// A semi-arbitrary upper bound
+static constexpr unsigned long kMaxWhereFromsToEncode = 10;
+
 namespace pbv1 = ::santa::pb::v1;
 
 namespace santa::santad::logs::endpoint_security::serializers {
@@ -520,6 +523,15 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedExec &msg, SNTCach
 
   EncodeString([pb_exec] { return pb_exec->mutable_explain(); }, cd.decisionExtra);
   EncodeString([pb_exec] { return pb_exec->mutable_quarantine_url(); }, cd.quarantineURL);
+
+  if (cd.whereFroms.count > 0) {
+    int numItemsToAdd = (int)std::min(cd.whereFroms.count, kMaxWhereFromsToEncode);
+    pb_exec->mutable_where_froms()->Reserve(numItemsToAdd);
+    for (int i = 0; i < numItemsToAdd; i++) {
+      std::string_view item = NSStringToUTF8StringView(cd.whereFroms[i]);
+      pb_exec->add_where_froms(item.data(), item.length());
+    }
+  }
 
   NSString *orig_path = Utilities::OriginalPathForTranslocation(msg.es_msg().event.exec.target);
   EncodeString([pb_exec] { return pb_exec->mutable_original_path(); }, orig_path);

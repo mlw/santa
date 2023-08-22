@@ -216,6 +216,13 @@
 - (NSDate *)quarantineTimestamp;
 
 ///
+/// Extended attribute metadata. When populated, this typically contains
+/// source and origin URLs. The order is undefined, though typically, if two
+/// items exist, the source URL is first and origin URL is second.
+///
+- (NSArray<NSString *> *)metaDataWhereFroms;
+
+///
 ///  @return The size of the file in bytes.
 ///
 - (NSUInteger)fileSize;

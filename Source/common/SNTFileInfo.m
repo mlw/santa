@@ -15,6 +15,9 @@
 #import "Source/common/SNTFileInfo.h"
 
 #import <CommonCrypto/CommonDigest.h>
+#include <CoreFoundation/CoreFoundation.h>
+#import <CoreServices/CoreServices.h>
+#import <Foundation/Foundation.h>
 #import <MOLCodesignChecker/MOLCodesignChecker.h>
 #import <fmdb/FMDB.h>
 
@@ -472,6 +475,43 @@ extern NSString *const NSURLQuarantinePropertiesKey WEAK_IMPORT_ATTRIBUTE;
 - (NSDate *)quarantineTimestamp {
   NSDate *timeStamp = [self quarantineData][@"LSQuarantineTimeStamp"];
   return timeStamp;
+}
+
+- (NSArray<NSString *> *)metaDataWhereFroms {
+  NSURL *url = [NSURL fileURLWithPath:self.path];
+  if (!url) {
+    return nil;
+  }
+
+  // Get the metadata for this file
+  MDItemRef mdRef = MDItemCreateWithURL(kCFAllocatorDefault, (__bridge CFURLRef)url);
+  if (!mdRef) {
+    return nil;
+  }
+
+  // Copy the `kMDItemWhereFroms` attribute
+  CFTypeRef itemRef = MDItemCopyAttribute(mdRef, kMDItemWhereFroms);
+
+  CFRelease(mdRef);
+
+  // Ensure the itemRef exists and is the expected type
+  if (!itemRef) {
+    return nil;
+  } else if (CFGetTypeID(itemRef) != CFArrayGetTypeID()) {
+    CFRelease(itemRef);
+    return nil;
+  }
+
+  // Go ahead and bridge into ObjC so we don't have to remember to release anything else.
+  NSArray *whereFroms = (NSArray *)CFBridgingRelease(itemRef);
+
+  for (id item in whereFroms) {
+    if (![item isKindOfClass:[NSString class]]) {
+      return nil;
+    }
+  }
+
+  return whereFroms;
 }
 
 #pragma mark Internal Methods

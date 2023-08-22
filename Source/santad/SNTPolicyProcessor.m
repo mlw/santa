@@ -90,6 +90,7 @@
     }
   }
   cd.quarantineURL = fileInfo.quarantineDataURL;
+  cd.whereFroms = fileInfo.metaDataWhereFroms;
 
   SNTRule *rule = [self.ruleTable ruleForBinarySHA256:cd.sha256
                                             signingID:signingID

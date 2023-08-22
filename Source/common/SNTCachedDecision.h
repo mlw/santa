@@ -40,6 +40,7 @@
 @property NSString *signingID;
 
 @property NSString *quarantineURL;
+@property NSArray<NSString *> *whereFroms;
 
 @property NSString *customMsg;
 @property NSString *customURL;

@@ -194,6 +194,9 @@ objc_library(
     name = "SNTFileInfo",
     srcs = ["SNTFileInfo.m"],
     hdrs = ["SNTFileInfo.h"],
+    sdk_frameworks = [
+        "CoreServices",
+    ],
     deps = [
         ":SNTLogging",
         "@FMDB",
