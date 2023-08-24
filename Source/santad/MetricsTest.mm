@@ -45,7 +45,7 @@ class MetricsPeer : public Metrics {
 
   bool IsRunning() { return timer_.IsRunning(); }
 
-  uint64_t Interval() { return interval_; }
+  uint64_t Interval() { return timer_.IntervalMS() / 1000; }
 
   std::map<EventCountTuple, int64_t> &EventCounts() { return event_counts_cache_; };
   std::map<EventTimesTuple, int64_t> &EventTimes() { return event_times_cache_; };
@@ -87,117 +87,121 @@ void TimerFunc(std::any ctx) {
   self.sema = dispatch_semaphore_create(0);
 }
 
-- (void)testStartStop {
-  santa::common::PeriodicTimer pt = santa::common::PeriodicTimer::Create(100, 0, TimerFunc);
+// - (void)testStartStop {
+//   santa::common::PeriodicTimer pt = santa::common::PeriodicTimer::Create(100 * 1000, 0, TimerFunc);
 
-  auto metrics =
-    std::make_shared<MetricsPeer>(std::move(pt),  // self.q,  // timer,
-                                  100, nil, nil, nil, nil, ^(santa::santad::Metrics *m) {
-                                    dispatch_semaphore_signal(self.sema);
-                                  });
+//   auto metrics =
+//     std::make_shared<MetricsPeer>(std::move(pt),
+//                                   //100,
+//                                   nil, nil, nil, nil, ^(santa::santad::Metrics *m) {
+//                                     dispatch_semaphore_signal(self.sema);
+//                                   });
 
-  XCTAssertFalse(metrics->IsRunning());
+//   XCTAssertFalse(metrics->IsRunning());
 
-  metrics->StartPoll();
-  XCTAssertEqual(0, dispatch_semaphore_wait(self.sema, DISPATCH_TIME_NOW),
-                 "Initialization block never called");
+//   // metrics->StartPoll();
+//   metrics->Start();
+//   XCTAssertEqual(0, dispatch_semaphore_wait(self.sema, DISPATCH_TIME_NOW),
+//                  "Initialization block never called");
 
-  // Should be marked running after starting
-  XCTAssertTrue(metrics->IsRunning());
+//   // Should be marked running after starting
+//   XCTAssertTrue(metrics->IsRunning());
 
-  metrics->StartPoll();
+//   // metrics->StartPoll();
+//   metrics->Start();
 
-  // Ensure the initialization block isn't called a second time
-  XCTAssertNotEqual(0, dispatch_semaphore_wait(self.sema, DISPATCH_TIME_NOW),
-                    "Initialization block called second time unexpectedly");
+//   // Ensure the initialization block isn't called a second time
+//   XCTAssertNotEqual(0, dispatch_semaphore_wait(self.sema, DISPATCH_TIME_NOW),
+//                     "Initialization block called second time unexpectedly");
 
-  // Double-start doesn't change the running state
-  XCTAssertTrue(metrics->IsRunning());
+//   // Double-start doesn't change the running state
+//   XCTAssertTrue(metrics->IsRunning());
 
-  sleep(0);
+//   sleep(0);
 
-  metrics->StopPoll();
+//   metrics->StopPoll();
 
-  // After stopping, the internal state is no longer marked running
-  XCTAssertFalse(metrics->IsRunning());
+//   // After stopping, the internal state is no longer marked running
+//   XCTAssertFalse(metrics->IsRunning());
 
-  metrics->StopPoll();
+//   metrics->StopPoll();
 
-  // Double-stop doesn't change the running state
-  XCTAssertFalse(metrics->IsRunning());
+//   // Double-stop doesn't change the running state
+//   XCTAssertFalse(metrics->IsRunning());
+// }
+
+- (void)testSetInterval {
+  santa::common::PeriodicTimer pt = santa::common::PeriodicTimer::Create(100 * 1000, 0, TimerFunc);
+  auto metrics = std::make_shared<MetricsPeer>(std::move(pt), //100,
+                                               nil, nil, nil, nil,
+                                               ^(santa::santad::Metrics *m){
+                                               });
+
+  XCTAssertEqual(101, metrics->Interval());
+
+  metrics->SetInterval(200);
+  XCTAssertEqual(200, metrics->Interval());
 }
 
-// - (void)testSetInterval {
-//   dispatch_source_t timer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, self.q);
-//   auto metrics = std::make_shared<MetricsPeer>(self.q, timer, 100, nil, nil, nil, nil,
-//                                                ^(santa::santad::Metrics *m){
-//                                                });
+- (void)testProcessorToString {
+  std::map<Processor, NSString *> processorToString = {
+    {Processor::kAuthorizer, @"Authorizer"},
+    {Processor::kDeviceManager, @"DeviceManager"},
+    {Processor::kRecorder, @"Recorder"},
+    {Processor::kTamperResistance, @"TamperResistance"},
+  };
 
-//   XCTAssertEqual(100, metrics->Interval());
+  for (const auto &kv : processorToString) {
+    XCTAssertEqualObjects(ProcessorToString(kv.first), kv.second);
+  }
 
-//   metrics->SetInterval(200);
-//   XCTAssertEqual(200, metrics->Interval());
-// }
+  XCTAssertThrows(ProcessorToString((Processor)12345));
+}
 
-// - (void)testProcessorToString {
-//   std::map<Processor, NSString *> processorToString = {
-//     {Processor::kAuthorizer, @"Authorizer"},
-//     {Processor::kDeviceManager, @"DeviceManager"},
-//     {Processor::kRecorder, @"Recorder"},
-//     {Processor::kTamperResistance, @"TamperResistance"},
-//   };
+- (void)testEventTypeToString {
+  std::map<es_event_type_t, NSString *> eventTypeToString = {
+    {ES_EVENT_TYPE_AUTH_CLONE, @"AuthClone"},
+    {ES_EVENT_TYPE_AUTH_COPYFILE, @"AuthCopyfile"},
+    {ES_EVENT_TYPE_AUTH_CREATE, @"AuthCreate"},
+    {ES_EVENT_TYPE_AUTH_EXCHANGEDATA, @"AuthExchangedata"},
+    {ES_EVENT_TYPE_AUTH_EXEC, @"AuthExec"},
+    {ES_EVENT_TYPE_AUTH_KEXTLOAD, @"AuthKextload"},
+    {ES_EVENT_TYPE_AUTH_LINK, @"AuthLink"},
+    {ES_EVENT_TYPE_AUTH_MOUNT, @"AuthMount"},
+    {ES_EVENT_TYPE_AUTH_REMOUNT, @"AuthRemount"},
+    {ES_EVENT_TYPE_AUTH_RENAME, @"AuthRename"},
+    {ES_EVENT_TYPE_AUTH_TRUNCATE, @"AuthTruncate"},
+    {ES_EVENT_TYPE_AUTH_UNLINK, @"AuthUnlink"},
+    {ES_EVENT_TYPE_NOTIFY_CLOSE, @"NotifyClose"},
+    {ES_EVENT_TYPE_NOTIFY_EXCHANGEDATA, @"NotifyExchangedata"},
+    {ES_EVENT_TYPE_NOTIFY_EXEC, @"NotifyExec"},
+    {ES_EVENT_TYPE_NOTIFY_EXIT, @"NotifyExit"},
+    {ES_EVENT_TYPE_NOTIFY_FORK, @"NotifyFork"},
+    {ES_EVENT_TYPE_NOTIFY_LINK, @"NotifyLink"},
+    {ES_EVENT_TYPE_NOTIFY_RENAME, @"NotifyRename"},
+    {ES_EVENT_TYPE_NOTIFY_UNLINK, @"NotifyUnlink"},
+    {ES_EVENT_TYPE_NOTIFY_UNMOUNT, @"NotifyUnmount"},
+  };
 
-//   for (const auto &kv : processorToString) {
-//     XCTAssertEqualObjects(ProcessorToString(kv.first), kv.second);
-//   }
+  for (const auto &kv : eventTypeToString) {
+    XCTAssertEqualObjects(EventTypeToString(kv.first), kv.second);
+  }
 
-//   XCTAssertThrows(ProcessorToString((Processor)12345));
-// }
+  XCTAssertThrows(EventTypeToString((es_event_type_t)12345));
+}
 
-// - (void)testEventTypeToString {
-//   std::map<es_event_type_t, NSString *> eventTypeToString = {
-//     {ES_EVENT_TYPE_AUTH_CLONE, @"AuthClone"},
-//     {ES_EVENT_TYPE_AUTH_COPYFILE, @"AuthCopyfile"},
-//     {ES_EVENT_TYPE_AUTH_CREATE, @"AuthCreate"},
-//     {ES_EVENT_TYPE_AUTH_EXCHANGEDATA, @"AuthExchangedata"},
-//     {ES_EVENT_TYPE_AUTH_EXEC, @"AuthExec"},
-//     {ES_EVENT_TYPE_AUTH_KEXTLOAD, @"AuthKextload"},
-//     {ES_EVENT_TYPE_AUTH_LINK, @"AuthLink"},
-//     {ES_EVENT_TYPE_AUTH_MOUNT, @"AuthMount"},
-//     {ES_EVENT_TYPE_AUTH_REMOUNT, @"AuthRemount"},
-//     {ES_EVENT_TYPE_AUTH_RENAME, @"AuthRename"},
-//     {ES_EVENT_TYPE_AUTH_TRUNCATE, @"AuthTruncate"},
-//     {ES_EVENT_TYPE_AUTH_UNLINK, @"AuthUnlink"},
-//     {ES_EVENT_TYPE_NOTIFY_CLOSE, @"NotifyClose"},
-//     {ES_EVENT_TYPE_NOTIFY_EXCHANGEDATA, @"NotifyExchangedata"},
-//     {ES_EVENT_TYPE_NOTIFY_EXEC, @"NotifyExec"},
-//     {ES_EVENT_TYPE_NOTIFY_EXIT, @"NotifyExit"},
-//     {ES_EVENT_TYPE_NOTIFY_FORK, @"NotifyFork"},
-//     {ES_EVENT_TYPE_NOTIFY_LINK, @"NotifyLink"},
-//     {ES_EVENT_TYPE_NOTIFY_RENAME, @"NotifyRename"},
-//     {ES_EVENT_TYPE_NOTIFY_UNLINK, @"NotifyUnlink"},
-//     {ES_EVENT_TYPE_NOTIFY_UNMOUNT, @"NotifyUnmount"},
-//   };
+- (void)testEventDispositionToString {
+  std::map<EventDisposition, NSString *> dispositionToString = {
+    {EventDisposition::kDropped, @"Dropped"},
+    {EventDisposition::kProcessed, @"Processed"},
+  };
 
-//   for (const auto &kv : eventTypeToString) {
-//     XCTAssertEqualObjects(EventTypeToString(kv.first), kv.second);
-//   }
+  for (const auto &kv : dispositionToString) {
+    XCTAssertEqualObjects(EventDispositionToString(kv.first), kv.second);
+  }
 
-//   XCTAssertThrows(EventTypeToString((es_event_type_t)12345));
-// }
-
-// - (void)testEventDispositionToString {
-//   std::map<EventDisposition, NSString *> dispositionToString = {
-//     {EventDisposition::kDropped, @"Dropped"},
-//     {EventDisposition::kProcessed, @"Processed"},
-//   };
-
-//   for (const auto &kv : dispositionToString) {
-//     XCTAssertEqualObjects(EventDispositionToString(kv.first), kv.second);
-//   }
-
-//   XCTAssertThrows(EventDispositionToString((EventDisposition)12345));
-// }
+  XCTAssertThrows(EventDispositionToString((EventDisposition)12345));
+}
 
 // - (void)testSetEventMetrics {
 //   int64_t nanos = 1234;

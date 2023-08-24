@@ -128,7 +128,8 @@ std::shared_ptr<Metrics> Metrics::Create(SNTMetricSet *metric_set, uint64_t inte
     santa::common::PeriodicTimer::Create(interval, 0, Metrics::Run);
 
   std::shared_ptr<Metrics> metrics =
-    std::make_shared<Metrics>(std::move(timer), interval, event_processing_times, event_counts,
+    std::make_shared<Metrics>(std::move(timer), //interval,
+                              event_processing_times, event_counts,
                               rate_limit_counts, metric_set, ^(Metrics *metrics) {
                                 SNTRegisterCoreMetrics();
                                 metrics->EstablishConnection();
@@ -164,13 +165,13 @@ void Metrics::PrintFromObj() {
   LOGE(@"Printing from obj!\n");
 }
 
-Metrics::Metrics(santa::common::PeriodicTimer timer, uint64_t interval,
+Metrics::Metrics(santa::common::PeriodicTimer timer,
                  SNTMetricInt64Gauge *event_processing_times, SNTMetricCounter *event_counts,
                  SNTMetricCounter *rate_limit_counts, SNTMetricSet *metric_set,
                  void (^run_on_first_start)(Metrics *))
-    : timer_(std::move(timer)),
+    : Timer(std::move(timer)),
+      // timer_(std::move(timer)),
       // q_(q),
-      interval_(interval),
       event_processing_times_(event_processing_times),
       event_counts_(event_counts),
       rate_limit_counts_(rate_limit_counts),
@@ -178,7 +179,7 @@ Metrics::Metrics(santa::common::PeriodicTimer timer, uint64_t interval,
       run_on_first_start_(run_on_first_start) {
   events_q_ = dispatch_queue_create("com.google.santa.santametricsservice.events_q",
                                     DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL);
-  SetInterval(interval);
+  // SetInterval(interval);
 }
 
 void Metrics::EstablishConnection() {
@@ -236,6 +237,7 @@ void Metrics::FlushMetrics() {
 }
 
 void Metrics::SetInterval(uint64_t interval) {
+  printf("Setting timer interval to: %llu\n", interval * 1000);
   timer_.SetInterval(interval * 1000);
 }
 
@@ -249,6 +251,7 @@ void Metrics::StartPoll() {
   std::weak_ptr<Metrics> weak_metrics = weak_from_this();
   timer_.Start(weak_metrics);
 }
+
 
 void Metrics::StopPoll() {
   timer_.Stop();

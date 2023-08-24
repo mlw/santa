@@ -58,7 +58,6 @@ void PeriodicTimer::TimerFire(void *ctx) {
   timer_data->func(timer_data->context);
 }
 
-// void PeriodicTimer::Start(void *ctx) {
 void PeriodicTimer::Start(std::any ctx) {
   printf("PeriodicTimer Start: q: %p | s: %p\n", timer_data_->queue, timer_data_->source);
   dispatch_sync(timer_data_->queue, ^{
@@ -91,10 +90,14 @@ void PeriodicTimer::SetInterval(uint64_t interval_ms) {
 }
 
 void PeriodicTimer::SetInterval(uint64_t interval_ms, uint64_t delay_ms) {
-  printf("Setting interval...\n");
+
+  dispatch_sync(timer_data_->queue, ^{
+    printf("Setting interval...: %llu\n", interval_ms);
+  interval_ms_ = interval_ms;
   dispatch_source_set_timer(timer_data_->source,
                             dispatch_time(DISPATCH_TIME_NOW, delay_ms * NSEC_PER_MSEC),
                             interval_ms * NSEC_PER_MSEC, 0);
+  });
 }
 
 void PeriodicTimer::RunSynchronouslyWithTimer(std::function<void()> func) {

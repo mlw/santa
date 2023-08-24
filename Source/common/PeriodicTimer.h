@@ -77,7 +77,7 @@ class PeriodicTimer {
 
   void RunSynchronouslyWithTimer(std::function<void()> func);
 
-  inline uint64_t IntervalMS() { return interval_ms_; };
+  inline uint64_t IntervalMS() { printf("Returning current interval ms: %llu\n", interval_ms_); return interval_ms_; };
   inline bool IsRunning() { return periodic_timer_started_; }
 
  private:
@@ -87,6 +87,66 @@ class PeriodicTimer {
 
   bool periodic_timer_started_ = false;
 };
+
+template <typename T>
+class Timer {
+  public:
+  Timer(PeriodicTimer timer) : timer_(std::move(timer)) {
+
+  };
+
+  virtual ~Timer() = default;
+
+  virtual void StartPoll() = 0;
+  virtual void StopPoll() = 0;
+
+  // void Start() {
+  //   static_cast<T*>(this)->StartImpl();
+  // }
+  protected:
+  PeriodicTimer timer_;
+};
+
+// class PeriodicTimerNew {
+//  public:
+//   static PeriodicTimerNew Create(
+//       uint64_t interval_ms, uint64_t delay_ms, PeriodicFunction func,
+//       std::string_view lbl = "com.google.santa.daemon.timer");
+
+// private:
+//   PeriodicTimerNew(uint64_t interval_ms, uint64_t delay_ms,
+//                 std::shared_ptr<TimerData> timer_data);
+// public:
+//   ~PeriodicTimerNew();
+
+//   // Allow moving timers
+//   PeriodicTimerNew(PeriodicTimerNew &&other) = default;
+//   PeriodicTimerNew &operator=(PeriodicTimerNew &&rhs) = default;
+
+//   // Timer isn't copyable
+//   PeriodicTimerNew(const PeriodicTimerNew &other) = delete;
+//   PeriodicTimerNew &operator=(const PeriodicTimerNew &rhs) = delete;
+
+//   static void TimerFire(void *ctx);
+
+//   void Start(std::any ctx);
+//   void Stop();
+
+//   void SetInterval(uint64_t interval_ms);
+//   void SetInterval(uint64_t interval_ms, uint64_t delay_ms);
+
+//   void RunSynchronouslyWithTimer(std::function<void()> func);
+
+//   inline uint64_t IntervalMS() { return interval_ms_; };
+//   inline bool IsRunning() { return periodic_timer_started_; }
+
+//  private:
+//   uint64_t interval_ms_;
+//   uint64_t delay_ms_;
+//   std::shared_ptr<TimerData> timer_data_;
+
+//   bool periodic_timer_started_ = false;
+// };
 
 }  // namespace santa::common
 

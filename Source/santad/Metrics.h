@@ -48,11 +48,11 @@ enum class Processor {
 using EventCountTuple = std::tuple<Processor, es_event_type_t, EventDisposition>;
 using EventTimesTuple = std::tuple<Processor, es_event_type_t>;
 
-class Metrics : public std::enable_shared_from_this<Metrics> {
+class Metrics : public santa::common::Timer<Metrics>, public std::enable_shared_from_this<Metrics> {
  public:
   static std::shared_ptr<Metrics> Create(SNTMetricSet *metric_set, uint64_t interval);
 
-  Metrics(santa::common::PeriodicTimer timer, uint64_t interval,
+  Metrics(santa::common::PeriodicTimer timer, //uint64_t interval,
           SNTMetricInt64Gauge *event_processing_times, SNTMetricCounter *event_counts,
           SNTMetricCounter *rate_limit_counts, SNTMetricSet *metric_set,
           void (^run_on_first_start)(Metrics *));
@@ -62,6 +62,7 @@ class Metrics : public std::enable_shared_from_this<Metrics> {
   void EstablishConnection();
   void StartPoll();
   void StopPoll();
+
   void SetInterval(uint64_t interval);
 
   // Force an immediate flush and export of metrics
@@ -77,13 +78,17 @@ class Metrics : public std::enable_shared_from_this<Metrics> {
 
   friend class santa::santad::MetricsPeer;
 
+  // void StartImpl();
+  // void StopImpl();
+
  private:
   void FlushMetrics();
   void ExportLocked();
 
+
+
   MOLXPCConnection *metrics_connection_;
-  santa::common::PeriodicTimer timer_;
-  uint64_t interval_;
+  // santa::common::PeriodicTimer timer_;
   SNTMetricInt64Gauge *event_processing_times_;
   SNTMetricCounter *event_counts_;
   SNTMetricCounter *rate_limit_counts_;
