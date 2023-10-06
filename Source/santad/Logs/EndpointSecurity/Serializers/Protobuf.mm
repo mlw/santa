@@ -15,7 +15,9 @@
 #include "Source/santad/Logs/EndpointSecurity/Serializers/Protobuf.h"
 
 #include <EndpointSecurity/EndpointSecurity.h>
+#include <Foundation/Foundation.h>
 #include <Kernel/kern/cs_blobs.h>
+#include <_types/_uint64_t.h>
 #include <bsm/libbsm.h>
 #include <google/protobuf/json/json.h>
 #include <mach/message.h>
@@ -36,6 +38,7 @@
 #include "Source/santad/Logs/EndpointSecurity/Serializers/Utilities.h"
 #import "Source/santad/SNTDecisionCache.h"
 #include "absl/status/status.h"
+#include "absl/strings/string_view.h"
 #include "google/protobuf/timestamp.pb.h"
 
 using google::protobuf::Arena;
@@ -67,6 +70,11 @@ using santa::santad::logs::endpoint_security::serializers::Utilities::RealGroup;
 using santa::santad::logs::endpoint_security::serializers::Utilities::RealUser;
 
 namespace pbv1 = ::santa::pb::v1;
+
+// Semi-arbitrary constants to mitigate encoding entitlements for binaries with
+// a large, complex dictionary structure.
+static constexpr int kMaxEncodeObjectNestingDepth = 3;
+static constexpr NSUInteger kMaxEncodeObjectEntries = 48;
 
 namespace santa::santad::logs::endpoint_security::serializers {
 
@@ -448,6 +456,165 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedExchange &msg) {
   return FinalizeProto(santa_msg);
 }
 
+// static inline void EncodeDictionary(
+//   ::google::protobuf::RepeatedPtrField<::pbv1::DictionaryValue> *pb_ents,
+//   NSDictionary *entitlements, int depth) {
+//   if (depth > kMaxEncodeObjectNestingDepth) {
+//     return;
+//   }
+
+//   __block int numObjectsToEncode = (int)std::min(kMaxEncodeObjectEntries, entitlements.count);
+//   pb_ents->Reserve(numObjectsToEncode);
+
+//   [entitlements enumerateKeysAndObjectsUsingBlock:^(id key, id obj, BOOL *stop){
+//     if (--numObjectsToEncode < 0) {
+//       *stop = YES;
+//       return;
+//     }
+
+//     if ([key isKindOfClass:[NSString class]]) {
+//       LOGE(@"Unexpected key type encoding dictionary: %@: %@", [key class], key);
+//       return;
+//     }
+
+//     pb_ents->add_kvpair();
+//   }];
+// }
+// static inline ::pbv1::DictionaryValue EncodeDictionary(
+
+static void EncodeNumber(::pbv1::ValueType *pb_vt, NSNumber *num) {
+  bool encode_float;
+
+  const char *s = [num objCType];
+  if (!s) {
+    LOGW(@"Unable to determine objCType, assuming integer");
+    encode_float = false;
+  } else if (s[0] == 'f' || s[0] == 'F' || s[0] == 'd' || s[0] == 'D') {
+    encode_float = true;
+  } else {
+    encode_float = false;
+  }
+
+  if (encode_float) {
+    pb_vt->set_double_value([num doubleValue]);
+  } else {
+    pb_vt->set_integer_value([num unsignedLongLongValue]);
+  }
+}
+
+static void EncodeDictionary(::pbv1::DictionaryValue *pb_dict, NSDictionary *dict, int depth);
+static void EncodeArray(::pbv1::ArrayValue *pb_arr, NSArray *arr, int depth);
+
+static void EncodeValue(std::function<::pbv1::ValueType *()> lazy_pb_vt, id obj, int depth) {
+  printf("EncodeValue ENTER | isStr: %d\n", [obj isKindOfClass:[NSString class]]);
+    if ([obj isKindOfClass:[NSNumber class]]) {
+      EncodeNumber(lazy_pb_vt(), obj);
+    } else if ([obj isKindOfClass:[NSString class]]) {
+      EncodeString([lazy_pb_vt] { return lazy_pb_vt()->mutable_string_value(); }, obj);
+      // EncodeString([kvp] { return kvp->mutable_value()->mutable_string_value(); }, obj);
+    } else if ([obj isKindOfClass:[NSDate class]]) {
+      // Log dates as seconds since Unix epoch
+      lazy_pb_vt()->set_integer_value((uint64_t)[(NSDate *)obj timeIntervalSince1970]);
+    } else if ([obj isKindOfClass:[NSData class]]) {
+      lazy_pb_vt()->set_bytes_value(
+        absl::string_view((const char *)((NSData *)obj).bytes, ((NSData *)obj).length));
+    } else if ([obj isKindOfClass:[NSDictionary class]]) {
+      if (depth < kMaxEncodeObjectNestingDepth) {
+        EncodeDictionary(lazy_pb_vt()->mutable_dictionary_value(), obj, depth + 1);
+      } else {
+        LOGW(@"Max encoding depth exceeded. Not all elements encoded.");
+      }
+    } else if ([obj isKindOfClass:[NSArray class]]) {
+      if (depth < kMaxEncodeObjectNestingDepth) {
+        EncodeArray(lazy_pb_vt()->mutable_array_value(), obj, depth + 1);
+      } else {
+        LOGW(@"Max encoding depth exceeded. Not all elements encoded.");
+      }
+    } else {
+      LOGW(@"Attempt to encode unknown object type: %@", NSStringFromClass([obj class]));
+    }
+}
+
+static void EncodeArray(::pbv1::ArrayValue *pb_arr, NSArray *arr, int depth) {
+  if (depth > kMaxEncodeObjectNestingDepth) {
+    return;
+  }
+
+  __block int numObjectsToEncode = (int)std::min(kMaxEncodeObjectEntries, arr.count);
+  pb_arr->mutable_elements()->Reserve(numObjectsToEncode);
+
+  [arr enumerateObjectsUsingBlock:^(id obj, NSUInteger idx, BOOL *stop){
+    if (--numObjectsToEncode < 0) {
+      *stop = YES;
+      return;
+    }
+
+    EncodeValue([pb_arr] { return pb_arr->mutable_elements()->Add(); }, obj, depth);
+  }];
+}
+
+// ::google::protobuf::RepeatedPtrField<::pbv1::DictionaryValue> *pb_dict,
+static void EncodeDictionary(::pbv1::DictionaryValue *pb_dict, NSDictionary *dict, int depth) {
+  printf("EncodeDictionary ENTER (depth: %d)\n", depth);
+  if (depth > kMaxEncodeObjectNestingDepth) {
+    return;
+  }
+
+  // ::pbv1::DictionaryValue *pb_dv = pb_dict->Add();
+
+  __block int numObjectsToEncode = (int)std::min(kMaxEncodeObjectEntries, dict.count);
+  pb_dict->mutable_kvpairs()->Reserve(numObjectsToEncode);
+
+  [dict enumerateKeysAndObjectsUsingBlock:^(id key, id obj, BOOL *stop) {
+    printf("Enumerating dict: key: %s | obj (%s)\n", ((NSString*)key).UTF8String, NSStringFromClass([obj class]).UTF8String);
+
+    if (--numObjectsToEncode < 0) {
+      *stop = YES;
+      return;
+    }
+
+    if (![key isKindOfClass:[NSString class]]) {
+      LOGE(@"Unexpected key type encoding dictionary: %@: %@", [key class], key);
+      return;
+    }
+
+    ::pbv1::KVPair *kvp = pb_dict->add_kvpairs();
+
+    kvp->set_key(((NSString *)key).UTF8String);
+
+    EncodeValue([kvp] { return kvp->mutable_value(); }, obj, depth);
+
+    // if ([obj isKindOfClass:[NSNumber class]]) {
+    //   EncodeNumber(kvp->mutable_value(), obj);
+    // } else if ([obj isKindOfClass:[NSString class]]) {
+    //   EncodeString([kvp] { return kvp->mutable_value()->mutable_string_value(); }, obj);
+    // } else if ([obj isKindOfClass:[NSDate class]]) {
+    //   // Log dates as seconds since Unix epoch
+    //   kvp->mutable_value()->set_integer_value((uint64_t)[(NSDate *)obj timeIntervalSince1970]);
+    // } else if ([obj isKindOfClass:[NSData class]]) {
+    //   kvp->mutable_value()->set_bytes_value(
+    //     absl::string_view((const char *)((NSData *)obj).bytes, ((NSData *)obj).length));
+    // } else if ([obj isKindOfClass:[NSDictionary class]]) {
+    //   if (depth < kMaxEncodeObjectNestingDepth) {
+    //     EncodeDictionary(kvp->mutable_value()->mutable_dictionary_value(), obj, depth + 1);
+    //   } else {
+    //     LOGW(@"Max encoding depth exceeded. Not all elements encoded.");
+    //   }
+    // } else if ([obj isKindOfClass:[NSArray class]]) {
+    //   if (depth < kMaxEncodeObjectNestingDepth) {
+    //     EncodeArray(kvp->mutable_value()->mutable_array_value(), obj, depth + 1);
+    //   } else {
+    //     LOGW(@"Max encoding depth exceeded. Not all elements encoded.");
+    //   }
+    // }
+  }];
+}
+
+void EncodeEntitlements(::pbv1::Execution *pb_exec, NSDictionary *entitlements) {
+  printf("EncodeEntitlements ENTER\n");
+  EncodeDictionary(pb_exec->mutable_entitlements()->Add(), entitlements, 1);
+}
+
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedExec &msg, SNTCachedDecision *cd) {
   Arena arena;
   ::pbv1::SantaMessage *santa_msg = CreateDefaultProto(&arena, msg);
@@ -504,6 +671,9 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedExec &msg, SNTCach
         }
       }
     }
+
+    // EncodeDictionary(pb_exec->mutable_entitlements(), cd.entitlements, 1);
+    EncodeEntitlements(pb_exec, cd.entitlements);
 
     // If the `max_fd` seen is less than `last_fd`, we know that ES truncated
     // the set of returned file descriptors

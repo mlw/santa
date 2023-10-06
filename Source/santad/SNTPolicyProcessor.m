@@ -21,6 +21,7 @@
 
 #import "Source/common/SNTCachedDecision.h"
 #import "Source/common/SNTConfigurator.h"
+#import "Source/common/SNTDeepCopy.h"
 #import "Source/common/SNTFileInfo.h"
 #import "Source/common/SNTRule.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
@@ -76,6 +77,10 @@
       cd.teamID = nil;
       cd.signingID = nil;
     } else {
+      // LOGE(@"csInfo.signingInformation: %@", csInfo.signingInformation);
+      // LOGE(@"csInfo.signingInformation[kSecCodeInfoEntitlements]: %@",
+      // csInfo.signingInformation[(__bridge NSString *)kSecCodeInfoEntitlements]);
+
       cd.certSHA256 = csInfo.leafCertificate.SHA256;
       cd.certCommonName = csInfo.leafCertificate.commonName;
       cd.certChain = csInfo.certificates;
@@ -94,15 +99,22 @@
         }
       }
 
+      // LOGE(@"%@: %@: kSecCodeInfoEntitlementsDict: %@",
+      //   signingID, fileInfo.path, csInfo.signingInformation[(__bridge NSString
+      //   *)kSecCodeInfoEntitlementsDict]);
+
+      cd.entitlements =
+        [csInfo.signingInformation[(__bridge NSString *)kSecCodeInfoEntitlementsDict] sntDeepCopy];
+
       cd.signingID = signingID;
     }
   }
   cd.quarantineURL = fileInfo.quarantineDataURL;
 
   SNTRule *rule = [self.ruleTable ruleForBinarySHA256:cd.sha256
-                                            signingID:signingID
+                                            signingID:cd.signingID
                                     certificateSHA256:cd.certSHA256
-                                               teamID:teamID];
+                                               teamID:cd.teamID];
   if (rule) {
     switch (rule.type) {
       case SNTRuleTypeBinary:

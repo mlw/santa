@@ -85,6 +85,12 @@ objc_library(
 )
 
 objc_library(
+    name = "SNTDeepCopy",
+    srcs = ["SNTDeepCopy.m"],
+    hdrs = ["SNTDeepCopy.h"],
+)
+
+objc_library(
     name = "CertificateHelpers",
     srcs = ["CertificateHelpers.m"],
     hdrs = ["CertificateHelpers.h"],

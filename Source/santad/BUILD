@@ -199,6 +199,7 @@ objc_library(
         "//Source/common:SNTCachedDecision",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTConfigurator",
+        "//Source/common:SNTDeepCopy",
         "//Source/common:SNTFileInfo",
         "//Source/common:SNTLogging",
         "//Source/common:SNTRule",
@@ -533,6 +534,7 @@ objc_library(
         "//Source/common:String",
         "//Source/common:santa_cc_proto_library_wrapper",
         "@com_google_absl//absl/status",
+        "@com_google_absl//absl/strings",
         "@com_google_protobuf//src/google/protobuf/json",
     ],
 )
