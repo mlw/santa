@@ -214,7 +214,7 @@ NS_ASSUME_NONNULL_BEGIN
 
     [self performStartupTasks:startupPrefs];
 
-    [self establishClientOrDie];
+    // [self establishClientOrDie];
   }
   return self;
 }

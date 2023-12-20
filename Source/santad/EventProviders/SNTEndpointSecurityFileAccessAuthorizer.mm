@@ -433,9 +433,9 @@ bool ShouldMessageTTY(const std::shared_ptr<WatchItemPolicy> &policy, const Mess
       [famEnabled set:self.isSubscribed forFieldValues:@[]];
     }];
 
-    [self establishClientOrDie];
+    // [self establishClientOrDie];
 
-    [super enableTargetPathWatching];
+    // [super enableTargetPathWatching];
   }
   return self;
 }

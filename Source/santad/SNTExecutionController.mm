@@ -290,6 +290,12 @@ static NSString *const kPrinterProxyPostMonterey =
       }
     }];
 
+  // if ([binInfo.path hasPrefix:@"/Applications/Arq.app"]) {
+  //   LOGE(@"ARQ: %@ | decision: %llu", binInfo.path, cd.decision);
+  // }
+
+  LOGE(@"~~~~~ SANTA EXEC: %@ | decision: %llu", binInfo.path, cd.decision);
+
   cd.vnodeId = SantaVnode::VnodeForFile(targetProc->executable);
 
   // Formulate an initial action from the decision.

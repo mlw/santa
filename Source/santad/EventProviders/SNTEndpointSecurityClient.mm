@@ -13,6 +13,7 @@
 ///    limitations under the License.
 
 #import "Source/santad/EventProviders/SNTEndpointSecurityClient.h"
+#include <EndpointSecurity/ESTypes.h>
 
 #include <EndpointSecurity/EndpointSecurity.h>
 #include <bsm/libbsm.h>
@@ -106,12 +107,22 @@ constexpr std::string_view kProtectedFiles[] = {"/private/var/db/santa/rules.db"
 }
 
 - (BOOL)shouldHandleMessage:(const Message &)esMsg {
+    if (esMsg->event_type == ES_EVENT_TYPE_AUTH_EXEC) {
+    LOGE(@"BAIL EXEC: target: %s | instigator: %s", esMsg->event.exec.target->executable->path.data,
+      esMsg->process->executable->path.data);
+    [self respondToMessage:esMsg withAuthResult:ES_AUTH_RESULT_ALLOW cacheable:true];
+    return NO;
+  }
+
   if (esMsg->process->is_es_client && [self.configurator ignoreOtherEndpointSecurityClients]) {
     if (esMsg->action_type == ES_ACTION_TYPE_AUTH) {
       [self respondToMessage:esMsg withAuthResult:ES_AUTH_RESULT_ALLOW cacheable:true];
     }
+    LOGE(@"DONT HANDLE OTHER ES CLIENT: %s", esMsg->process->executable->path.data);
     return NO;
   }
+
+
 
   return YES;
 }
@@ -132,6 +143,9 @@ constexpr std::string_view kProtectedFiles[] = {"/private/var/db/santa/rules.db"
 
     es_event_type_t eventType = esMsg->event_type;
     if ([self shouldHandleMessage:esMsg]) {
+      if (esMsg->event_type == ES_EVENT_TYPE_AUTH_EXEC) {
+        LOGE(@"HANDLE EXEC: %s", esMsg->event.exec.target->executable->path.data);
+      }
       [self handleMessage:std::move(esMsg)
         recordEventMetrics:^(EventDisposition disposition) {
           int64_t processingEnd = clock_gettime_nsec_np(CLOCK_MONOTONIC);
@@ -187,6 +201,7 @@ constexpr std::string_view kProtectedFiles[] = {"/private/var/db/santa/rules.db"
 }
 
 - (bool)subscribe:(const std::set<es_event_type_t> &)events {
+  LOGE(@"SUBSCRIBE TO EVENTS: %@", self);
   return _esApi->Subscribe(_esClient, events);
 }
 

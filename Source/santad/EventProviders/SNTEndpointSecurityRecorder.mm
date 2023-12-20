@@ -74,7 +74,7 @@ es_file_t *GetTargetFileForPrefixTree(const es_message_t *msg) {
     _prefixTree = prefixTree;
     _configurator = [SNTConfigurator configurator];
 
-    [self establishClientOrDie];
+    // [self establishClientOrDie];
   }
   return self;
 }
@@ -155,14 +155,14 @@ es_file_t *GetTargetFileForPrefixTree(const es_message_t *msg) {
 
 - (void)enable {
   [super subscribe:{
-                     ES_EVENT_TYPE_NOTIFY_CLOSE,
-                     ES_EVENT_TYPE_NOTIFY_EXCHANGEDATA,
-                     ES_EVENT_TYPE_NOTIFY_EXEC,
-                     ES_EVENT_TYPE_NOTIFY_EXIT,
-                     ES_EVENT_TYPE_NOTIFY_FORK,
-                     ES_EVENT_TYPE_NOTIFY_LINK,
-                     ES_EVENT_TYPE_NOTIFY_RENAME,
-                     ES_EVENT_TYPE_NOTIFY_UNLINK,
+                    //  ES_EVENT_TYPE_NOTIFY_CLOSE,
+                    //  ES_EVENT_TYPE_NOTIFY_EXCHANGEDATA,
+                    //  ES_EVENT_TYPE_NOTIFY_EXEC,
+                    //  ES_EVENT_TYPE_NOTIFY_EXIT,
+                    //  ES_EVENT_TYPE_NOTIFY_FORK,
+                    //  ES_EVENT_TYPE_NOTIFY_LINK,
+                    //  ES_EVENT_TYPE_NOTIFY_RENAME,
+                    //  ES_EVENT_TYPE_NOTIFY_UNLINK,
                    }];
 }
 

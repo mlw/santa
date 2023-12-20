@@ -78,6 +78,8 @@ using santa::santad::event_providers::endpoint_security::Message;
         default: break;
       }
 
+      LOGE(@"RESPOND FROM CACHE: %s | %ld", targetFile->path.data, returnAction);
+
       [self respondToMessage:msg
               withAuthResult:authResult
                    cacheable:(authResult == ES_AUTH_RESULT_ALLOW)];

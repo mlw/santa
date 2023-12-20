@@ -448,14 +448,17 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
   // means that the AUTH EXEC event is subscribed first and Santa can apply
   // execution policy appropriately.
   [authorizer_client enable];
-  [tamper_client enable];
-  if (@available(macOS 13.0, *)) {
-    // Start monitoring any watched items
-    // Note: This feature is only enabled on macOS 13.0+
-    watch_items->BeginPeriodicTask();
-  }
-  [monitor_client enable];
-  [device_client enable];
+  // [tamper_client enable];
+  // if (@available(macOS 13.0, *)) {
+  //   // Start monitoring any watched items
+  //   // Note: This feature is only enabled on macOS 13.0+
+  //   watch_items->BeginPeriodicTask();
+  // }
+  // [monitor_client enable];
+  // [device_client enable];
+  (void)tamper_client;
+  (void)monitor_client;
+  (void)device_client;
 
   [[NSRunLoop mainRunLoop] run];
 }

@@ -43,7 +43,7 @@ static constexpr std::string_view kSantaKextIdentifier = "com.google.santa-drive
   if (self) {
     _logger = logger;
 
-    [self establishClientOrDie];
+    // [self establishClientOrDie];
   }
   return self;
 }
