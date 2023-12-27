@@ -12,6 +12,7 @@
 ///    See the License for the specific language governing permissions and
 ///    limitations under the License.
 
+#include <EndpointSecurity/EndpointSecurity.h>
 #include <Foundation/Foundation.h>
 #include <dispatch/dispatch.h>
 #include <mach/task.h>
@@ -27,7 +28,7 @@
 using santa::santad::SantadDeps;
 
 // Number of seconds to wait between checks.
-const int kWatchdogTimeInterval = 30;
+// const int kWatchdogTimeInterval = 30;
 
 extern "C" uint64_t watchdogCPUEvents;
 extern "C" uint64_t watchdogRAMEvents;
@@ -41,48 +42,48 @@ struct WatchdogState {
 
 ///  The watchdog thread function, used to monitor santad CPU/RAM usage and print a warning
 ///  if it goes over certain thresholds.
-static void SantaWatchdog(void *context) {
-  WatchdogState *state = (WatchdogState *)context;
+// static void SantaWatchdog(void *context) {
+//   WatchdogState *state = (WatchdogState *)context;
 
-  // Amount of CPU usage to trigger warning, as a percentage averaged over kWatchdogTimeInterval
-  // santad's usual CPU usage is 0-3% but can occasionally spike if lots of processes start at once.
-  const int cpu_warn_threshold = 20.0;
+//   // Amount of CPU usage to trigger warning, as a percentage averaged over kWatchdogTimeInterval
+//   // santad's usual CPU usage is 0-3% but can occasionally spike if lots of processes start at once.
+//   const int cpu_warn_threshold = 20.0;
 
-  // Amount of RAM usage to trigger warning, in MB.
-  // santad's usual RAM usage is between 5-50MB but can spike if lots of processes start at once.
-  const int mem_warn_threshold = 250;
+//   // Amount of RAM usage to trigger warning, in MB.
+//   // santad's usual RAM usage is between 5-50MB but can spike if lots of processes start at once.
+//   const int mem_warn_threshold = 250;
 
-  std::optional<SantaTaskInfo> tinfo = GetTaskInfo();
+//   std::optional<SantaTaskInfo> tinfo = GetTaskInfo();
 
-  if (tinfo.has_value()) {
-    // CPU
-    double total_time =
-      (tinfo->total_user_nanos + tinfo->total_system_nanos) / (double)NSEC_PER_SEC;
-    double percentage =
-      (((total_time - state->prev_total_time) / (double)kWatchdogTimeInterval) * 100.0);
-    state->prev_total_time = total_time;
+//   if (tinfo.has_value()) {
+//     // CPU
+//     double total_time =
+//       (tinfo->total_user_nanos + tinfo->total_system_nanos) / (double)NSEC_PER_SEC;
+//     double percentage =
+//       (((total_time - state->prev_total_time) / (double)kWatchdogTimeInterval) * 100.0);
+//     state->prev_total_time = total_time;
 
-    if (percentage > cpu_warn_threshold) {
-      LOGW(@"Watchdog: potentially high CPU use, ~%.2f%% over last %d seconds.", percentage,
-           kWatchdogTimeInterval);
-      watchdogCPUEvents++;
-    }
+//     if (percentage > cpu_warn_threshold) {
+//       LOGW(@"Watchdog: potentially high CPU use, ~%.2f%% over last %d seconds.", percentage,
+//            kWatchdogTimeInterval);
+//       watchdogCPUEvents++;
+//     }
 
-    if (percentage > watchdogCPUPeak) watchdogCPUPeak = percentage;
+//     if (percentage > watchdogCPUPeak) watchdogCPUPeak = percentage;
 
-    // RAM
-    double ram_use_mb = (double)tinfo->resident_size / 1024 / 1024;
-    if (ram_use_mb > mem_warn_threshold && ram_use_mb > state->prev_ram_use_mb) {
-      LOGW(@"Watchdog: potentially high RAM use, RSS is %.2fMB.", ram_use_mb);
-      watchdogRAMEvents++;
-    }
-    state->prev_ram_use_mb = ram_use_mb;
+//     // RAM
+//     double ram_use_mb = (double)tinfo->resident_size / 1024 / 1024;
+//     if (ram_use_mb > mem_warn_threshold && ram_use_mb > state->prev_ram_use_mb) {
+//       LOGW(@"Watchdog: potentially high RAM use, RSS is %.2fMB.", ram_use_mb);
+//       watchdogRAMEvents++;
+//     }
+//     state->prev_ram_use_mb = ram_use_mb;
 
-    if (ram_use_mb > watchdogRAMPeak) {
-      watchdogRAMPeak = ram_use_mb;
-    }
-  }
-}
+//     if (ram_use_mb > watchdogRAMPeak) {
+//       watchdogRAMPeak = ram_use_mb;
+//     }
+//   }
+// }
 
 void CleanupAndReExec() {
   LOGI(@"com.google.santa.daemon is running from an unexpected path: cleaning up");
@@ -109,7 +110,7 @@ void CleanupAndReExec() {
 int main(int argc, char *argv[]) {
   @autoreleasepool {
     // Do not wait on child processes
-    signal(SIGCHLD, SIG_IGN);
+    // signal(SIGCHLD, SIG_IGN);
 
     NSDictionary *info_dict = [[NSBundle mainBundle] infoDictionary];
     NSProcessInfo *pi = [NSProcessInfo processInfo];
@@ -129,31 +130,59 @@ int main(int argc, char *argv[]) {
       CleanupAndReExec();
     }
 
-    dispatch_queue_t watchdog_queue = dispatch_queue_create(
-      "com.google.santa.daemon.watchdog", DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL);
-    dispatch_source_t watchdog_timer =
-      dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, watchdog_queue);
+    // dispatch_queue_t watchdog_queue = dispatch_queue_create(
+    //   "com.google.santa.daemon.watchdog", DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL);
+    // dispatch_source_t watchdog_timer =
+    //   dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, watchdog_queue);
 
-    WatchdogState state = {.prev_total_time = 0.0, .prev_ram_use_mb = 0.0};
+    // WatchdogState state = {.prev_total_time = 0.0, .prev_ram_use_mb = 0.0};
 
-    if (watchdog_timer) {
-      dispatch_source_set_timer(watchdog_timer, DISPATCH_TIME_NOW,
-                                kWatchdogTimeInterval * NSEC_PER_SEC, 0);
-      dispatch_source_set_event_handler_f(watchdog_timer, SantaWatchdog);
-      dispatch_set_context(watchdog_timer, &state);
-      dispatch_resume(watchdog_timer);
-    } else {
-      LOGE(@"Failed to start Santa watchdog");
+    // if (watchdog_timer) {
+    //   dispatch_source_set_timer(watchdog_timer, DISPATCH_TIME_NOW,
+    //                             kWatchdogTimeInterval * NSEC_PER_SEC, 0);
+    //   dispatch_source_set_event_handler_f(watchdog_timer, SantaWatchdog);
+    //   dispatch_set_context(watchdog_timer, &state);
+    //   dispatch_resume(watchdog_timer);
+    // } else {
+    //   LOGE(@"Failed to start Santa watchdog");
+    // }
+
+    os_log_error(OS_LOG_DEFAULT, "ES Client the old fashioned way...");
+
+    es_client_t *client;
+    es_new_client_result_t result = es_new_client(&client, ^(es_client_t *c, const es_message_t *msg) {
+      os_log_error(OS_LOG_DEFAULT, "GOT EXEC: target: %{public}s instigator: %{public}s", msg->event.exec.target->executable->path.data,
+        msg->process->executable->path.data);
+      es_respond_auth_result(c, msg, ES_AUTH_RESULT_ALLOW, false);
+    });
+
+    if (result != ES_NEW_CLIENT_RESULT_SUCCESS) {
+      os_log_error(OS_LOG_DEFAULT, "Failed to create new ES client: %d", result);
+      return 1;
     }
 
-    std::unique_ptr<SantadDeps> deps =
-      SantadDeps::Create([SNTConfigurator configurator], [SNTMetricSet sharedInstance]);
+    os_log_error(OS_LOG_DEFAULT, "Successfully created client");
 
-    // This doesn't return
-    SantadMain(deps->ESAPI(), deps->Logger(), deps->Metrics(), deps->WatchItems(), deps->Enricher(),
-               deps->AuthResultCache(), deps->ControlConnection(), deps->CompilerController(),
-               deps->NotifierQueue(), deps->SyncdQueue(), deps->ExecController(),
-               deps->PrefixTree(), deps->TTYWriter());
+    es_event_type_t events[] = { ES_EVENT_TYPE_AUTH_EXEC };
+    if (es_subscribe(client, events, sizeof(events) / sizeof(events[0])) != ES_RETURN_SUCCESS) {
+      os_log_error(OS_LOG_DEFAULT, "Failed to subscribe to events");
+      es_delete_client(client);
+      return 1;
+    }
+
+    os_log_error(OS_LOG_DEFAULT, "Successfully subscribed");
+
+    // std::unique_ptr<SantadDeps> deps =
+    //   SantadDeps::Create([SNTConfigurator configurator], [SNTMetricSet sharedInstance]);
+
+    // // This doesn't return
+    // SantadMain(deps->ESAPI(), deps->Logger(), deps->Metrics(), deps->WatchItems(), deps->Enricher(),
+    //            deps->AuthResultCache(), deps->ControlConnection(), deps->CompilerController(),
+    //            deps->NotifierQueue(), deps->SyncdQueue(), deps->ExecController(),
+    //            deps->PrefixTree(), deps->TTYWriter());
+
+    // [[NSRunLoop mainRunLoop] run];
+    dispatch_main();
   }
 
   return 0;

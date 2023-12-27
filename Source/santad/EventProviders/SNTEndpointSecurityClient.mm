@@ -122,8 +122,6 @@ constexpr std::string_view kProtectedFiles[] = {"/private/var/db/santa/rules.db"
     return NO;
   }
 
-
-
   return YES;
 }
 

@@ -153,7 +153,7 @@ using santa::santad::event_providers::endpoint_security::Message;
 }
 
 - (void)enable {
-  [super subscribeAndClearCache:{
+  [super subscribe:{
                                   ES_EVENT_TYPE_AUTH_EXEC,
                                 }];
 }
