@@ -1,16 +1,17 @@
 /// Copyright 2022 Google Inc. All rights reserved.
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///    http://www.apache.org/licenses/LICENSE-2.0
+///     http://www.apache.org/licenses/LICENSE-2.0
 ///
-///    Unless required by applicable law or agreed to in writing, software
-///    distributed under the License is distributed on an "AS IS" BASIS,
-///    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-///    See the License for the specific language governing permissions and
-///    limitations under the License.
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 
 /// This file groups all of the enriched message types - that is the
 /// objects that are constructed to hold all enriched event data prior
@@ -435,14 +436,61 @@ class EnrichedLoginLogout : public EnrichedEventType {
   EnrichedLoginLogout(EnrichedLoginLogout &&) = default;
 };
 
-using EnrichedType = std::variant<
-    EnrichedClose, EnrichedExchange, EnrichedExec, EnrichedExit, EnrichedFork,
-    EnrichedLink, EnrichedRename, EnrichedUnlink, EnrichedCSInvalidated,
-    EnrichedLoginWindowSessionLogin, EnrichedLoginWindowSessionLogout,
-    EnrichedLoginWindowSessionLock, EnrichedLoginWindowSessionUnlock,
-    EnrichedScreenSharingAttach, EnrichedScreenSharingDetach,
-    EnrichedOpenSSHLogin, EnrichedOpenSSHLogout, EnrichedLoginLogin,
-    EnrichedLoginLogout>;
+class EnrichedAuthenticationOD : public EnrichedEventType {
+ public:
+  using EnrichedEventType::EnrichedEventType;
+
+  EnrichedAuthenticationOD(EnrichedAuthenticationOD &&) = default;
+};
+
+class EnrichedAuthenticationTouchID : public EnrichedEventType {
+ public:
+  EnrichedAuthenticationTouchID(
+      Message &&es_msg, EnrichedProcess instigator,
+      std::optional<std::shared_ptr<std::string>> username)
+      : EnrichedEventType(std::move(es_msg), std::move(instigator)),
+        username_(std::move(username)) {}
+
+  EnrichedAuthenticationTouchID(EnrichedAuthenticationTouchID &&) = default;
+
+ private:
+  std::optional<std::shared_ptr<std::string>> username_;
+};
+
+class EnrichedAuthenticationToken : public EnrichedEventType {
+ public:
+  using EnrichedEventType::EnrichedEventType;
+
+  EnrichedAuthenticationToken(EnrichedAuthenticationToken &&) = default;
+};
+
+class EnrichedAuthenticationAutoUnlock : public EnrichedEventType {
+ public:
+  EnrichedAuthenticationAutoUnlock(Message &&es_msg, EnrichedProcess instigator,
+                                   std::optional<uid_t> uid)
+      : EnrichedEventType(std::move(es_msg), std::move(instigator)),
+        uid_(std::move(uid)) {}
+
+  EnrichedAuthenticationAutoUnlock(EnrichedAuthenticationAutoUnlock &&) =
+      default;
+
+  inline std::optional<uid_t> UID() const { return uid_; }
+
+ private:
+  std::optional<uid_t> uid_;
+};
+
+using EnrichedType =
+    std::variant<EnrichedClose, EnrichedExchange, EnrichedExec, EnrichedExit,
+                 EnrichedFork, EnrichedLink, EnrichedRename, EnrichedUnlink,
+                 EnrichedCSInvalidated, EnrichedLoginWindowSessionLogin,
+                 EnrichedLoginWindowSessionLogout,
+                 EnrichedLoginWindowSessionLock,
+                 EnrichedLoginWindowSessionUnlock, EnrichedScreenSharingAttach,
+                 EnrichedScreenSharingDetach, EnrichedOpenSSHLogin,
+                 EnrichedOpenSSHLogout, EnrichedLoginLogin, EnrichedLoginLogout,
+                 EnrichedAuthenticationOD, EnrichedAuthenticationTouchID,
+                 EnrichedAuthenticationToken, EnrichedAuthenticationAutoUnlock>;
 
 class EnrichedMessage {
  public:

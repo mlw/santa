@@ -49,6 +49,10 @@ class Empty : public Serializer {
   std::vector<uint8_t> SerializeMessage(const santa::EnrichedOpenSSHLogout &) override;
   std::vector<uint8_t> SerializeMessage(const santa::EnrichedLoginLogin &) override;
   std::vector<uint8_t> SerializeMessage(const santa::EnrichedLoginLogout &) override;
+  std::vector<uint8_t> SerializeMessage(const santa::EnrichedAuthenticationOD &) override;
+  std::vector<uint8_t> SerializeMessage(const santa::EnrichedAuthenticationTouchID &) override;
+  std::vector<uint8_t> SerializeMessage(const santa::EnrichedAuthenticationToken &) override;
+  std::vector<uint8_t> SerializeMessage(const santa::EnrichedAuthenticationAutoUnlock &) override;
 
   std::vector<uint8_t> SerializeFileAccess(const std::string &policy_version,
                                            const std::string &policy_name,
