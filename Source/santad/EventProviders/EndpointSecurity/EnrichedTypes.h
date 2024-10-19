@@ -453,6 +453,10 @@ class EnrichedAuthenticationTouchID : public EnrichedEventType {
 
   EnrichedAuthenticationTouchID(EnrichedAuthenticationTouchID &&) = default;
 
+  const std::optional<std::shared_ptr<std::string>> &Username() const {
+    return username_;
+  }
+
  private:
   std::optional<std::shared_ptr<std::string>> username_;
 };

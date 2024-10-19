@@ -132,7 +132,7 @@ uint32_t MaxSupportedESMessageVersionForCurrentOS() {
   //            4 | 11.0
   //            5 | 12.3
   //            6 | 13.0
-  //            7 | 14.0
+  //            7 | 13.3
   //            8 | 15.0
   if (@available(macOS 13.0, *)) {
     return 6;
