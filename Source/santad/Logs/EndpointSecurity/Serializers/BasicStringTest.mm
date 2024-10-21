@@ -504,7 +504,7 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
 }
 
 - (void)testGetAuthenticationTouchIDModeString {
-  std::map<es_touchid_mode_t, std::string> touchIDModeToString {
+  std::map<es_touchid_mode_t, std::string> touchIDModeToString{
     {ES_TOUCHID_MODE_VERIFICATION, "VERIFICATION"},
     {ES_TOUCHID_MODE_IDENTIFICATION, "IDENTIFICATION"},
     {(es_touchid_mode_t)1234, "UNKNOWN"},
@@ -521,7 +521,8 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
   es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_AUTHENTICATION, &proc);
 
   es_file_t instigatorProcFile = MakeESFile("foo");
-  es_process_t instigatorProc = MakeESProcess(&instigatorProcFile, MakeAuditToken(21, 43), MakeAuditToken(65, 87));
+  es_process_t instigatorProc =
+    MakeESProcess(&instigatorProcFile, MakeAuditToken(21, 43), MakeAuditToken(65, 87));
 
   es_event_authentication_od_t od = {
     .instigator = &instigatorProc,
@@ -542,11 +543,12 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
   esMsg.version = 8;
 
   std::string got = BasicStringSerializeMessage(&esMsg);
-  std::string want = "action=AUTHENTICATION_OD|success=true|pid=12|ppid=56|process=foo|processpath=foo"
-                     "|uid=-2|user=nobody|gid=-1|group=nogroup|auth_pid=21|auth_ppid=65|auth_process=foo"
-                     "|auth_processpath=foo|auth_uid=-2|auth_user=(null)|auth_gid=-1|auth_group=(null)"
-                     "|record_type=my_rec_type|record_name=my_rec_name|node_name=my_node_name"
-                     "|db_path=my_db_path|machineid=my_id\n";
+  std::string want =
+    "action=AUTHENTICATION_OD|success=true|pid=12|ppid=56|process=foo|processpath=foo"
+    "|uid=-2|user=nobody|gid=-1|group=nogroup|auth_pid=21|auth_ppid=65|auth_process=foo"
+    "|auth_processpath=foo|auth_uid=-2|auth_user=nobody|auth_gid=-1|auth_group=nogroup"
+    "|record_type=my_rec_type|record_name=my_rec_name|node_name=my_node_name"
+    "|db_path=my_db_path|machineid=my_id\n";
 
   XCTAssertCppStringEqual(got, want);
 
@@ -581,7 +583,8 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
   es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_AUTHENTICATION, &proc);
 
   es_file_t instigatorProcFile = MakeESFile("foo");
-  es_process_t instigatorProc = MakeESProcess(&instigatorProcFile, MakeAuditToken(21, 43), MakeAuditToken(65, 87));
+  es_process_t instigatorProc =
+    MakeESProcess(&instigatorProcFile, MakeAuditToken(21, 43), MakeAuditToken(65, 87));
 
   es_event_authentication_touchid_t touchid = {
     .instigator = &instigatorProc,
@@ -601,10 +604,11 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
   esMsg.version = 8;
 
   std::string got = BasicStringSerializeMessage(&esMsg);
-  std::string want = "action=AUTHENTICATION_TOUCHID|success=true|pid=12|ppid=56|process=foo|processpath=foo"
-                     "|uid=-2|user=nobody|gid=-1|group=nogroup|auth_pid=21|auth_ppid=65|auth_process=foo"
-                     "|auth_processpath=foo|auth_uid=-2|auth_user=(null)|auth_gid=-1|auth_group=(null)"
-                     "|touchid_mode=VERIFICATION|event_user=nobody|event_uid=4294967294|machineid=my_id\n";
+  std::string want =
+    "action=AUTHENTICATION_TOUCHID|success=true|pid=12|ppid=56|process=foo|processpath=foo"
+    "|uid=-2|user=nobody|gid=-1|group=nogroup|auth_pid=21|auth_ppid=65|auth_process=foo"
+    "|auth_processpath=foo|auth_uid=-2|auth_user=nobody|auth_gid=-1|auth_group=nogroup"
+    "|touchid_mode=VERIFICATION|event_user=nobody|event_uid=4294967294|machineid=my_id\n";
 
   XCTAssertCppStringEqual(got, want);
 
@@ -613,8 +617,8 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
 
   got = BasicStringSerializeMessage(&esMsg);
   want = "action=AUTHENTICATION_TOUCHID|success=true|pid=12|ppid=56|process=foo|processpath=foo"
-         "|uid=-2|user=nobody|gid=-1|group=nogroup|auth_pid=654|auth_pidver=321|touchid_mode=VERIFICATION"
-         "|event_user=nobody|event_uid=4294967294|machineid=my_id\n";
+         "|uid=-2|user=nobody|gid=-1|group=nogroup|auth_pid=654|auth_pidver=321"
+         "|touchid_mode=VERIFICATION|event_user=nobody|event_uid=4294967294|machineid=my_id\n";
 
   XCTAssertCppStringEqual(got, want);
 
@@ -637,7 +641,8 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
   es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_AUTHENTICATION, &proc);
 
   es_file_t instigatorProcFile = MakeESFile("foo");
-  es_process_t instigatorProc = MakeESProcess(&instigatorProcFile, MakeAuditToken(21, 43), MakeAuditToken(65, 87));
+  es_process_t instigatorProc =
+    MakeESProcess(&instigatorProcFile, MakeAuditToken(21, 43), MakeAuditToken(65, 87));
 
   es_event_authentication_token_t token = {
     .instigator = &instigatorProc,
@@ -657,11 +662,12 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
   esMsg.version = 8;
 
   std::string got = BasicStringSerializeMessage(&esMsg);
-  std::string want = "action=AUTHENTICATION_TOKEN|success=true|pid=12|ppid=56|process=foo|processpath=foo"
-                     "|uid=-2|user=nobody|gid=-1|group=nogroup|auth_pid=21|auth_ppid=65|auth_process=foo"
-                     "|auth_processpath=foo|auth_uid=-2|auth_user=(null)|auth_gid=-1|auth_group=(null)"
-                     "|pubkey_hash=abc123|token_id=my_tok_id|kerberos_principal=my_kerberos_principal"
-                     "|machineid=my_id\n";
+  std::string want =
+    "action=AUTHENTICATION_TOKEN|success=true|pid=12|ppid=56|process=foo|processpath=foo"
+    "|uid=-2|user=nobody|gid=-1|group=nogroup|auth_pid=21|auth_ppid=65|auth_process=foo"
+    "|auth_processpath=foo|auth_uid=-2|auth_user=nobody|auth_gid=-1|auth_group=nogroup"
+    "|pubkey_hash=abc123|token_id=my_tok_id|kerberos_principal=my_kerberos_principal"
+    "|machineid=my_id\n";
 
   XCTAssertCppStringEqual(got, want);
 
@@ -683,13 +689,14 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
 
   got = BasicStringSerializeMessage(&esMsg);
   want = "action=AUTHENTICATION_TOKEN|success=true|pid=12|ppid=56|process=foo|processpath=foo"
-         "|uid=-2|user=nobody|gid=-1|group=nogroup|pubkey_hash=abc123|token_id=my_tok_id|machineid=my_id\n";
+         "|uid=-2|user=nobody|gid=-1|group=nogroup|pubkey_hash=abc123|token_id=my_tok_id"
+         "|machineid=my_id\n";
 
   XCTAssertCppStringEqual(got, want);
 }
 
 - (void)testGetAuthenticationAutoUnlockTypeString {
-  std::map<es_auto_unlock_type_t, std::string> autoUnlockTypeToString {
+  std::map<es_auto_unlock_type_t, std::string> autoUnlockTypeToString{
     {ES_AUTO_UNLOCK_MACHINE_UNLOCK, "MACHINE_UNLOCK"},
     {ES_AUTO_UNLOCK_AUTH_PROMPT, "AUTH_PROMPT"},
     {(es_auto_unlock_type_t)1234, "UNKNOWN"},

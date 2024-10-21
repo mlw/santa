@@ -160,8 +160,10 @@ class EnrichedEventType {
     return enrichment_time_;
   }
 
- private:
+ protected:
   Message es_msg_;
+
+ private:
   EnrichedProcess instigator_;
   struct timespec enrichment_time_;
 };
@@ -436,22 +438,57 @@ class EnrichedLoginLogout : public EnrichedEventType {
   EnrichedLoginLogout(EnrichedLoginLogout &&) = default;
 };
 
-class EnrichedAuthenticationOD : public EnrichedEventType {
+class EnrichedAuthenticationWithInstigator : public EnrichedEventType {
  public:
-  using EnrichedEventType::EnrichedEventType;
+  EnrichedAuthenticationWithInstigator(
+      Message &&es_msg, EnrichedProcess instigator,
+      std::optional<EnrichedProcess> auth_instigator)
+      : EnrichedEventType(std::move(es_msg), std::move(instigator)),
+        auth_instigator_(std::move(auth_instigator)) {}
+  virtual ~EnrichedAuthenticationWithInstigator() = default;
 
-  EnrichedAuthenticationOD(EnrichedAuthenticationOD &&) = default;
+  EnrichedAuthenticationWithInstigator(
+      EnrichedAuthenticationWithInstigator &&) = default;
+
+  virtual audit_token_t AuthInstigatorToken() const = 0;
+
+  const std::optional<EnrichedProcess> &AuthInstigator() const {
+    return auth_instigator_;
+  }
+
+ private:
+  std::optional<EnrichedProcess> auth_instigator_;
 };
 
-class EnrichedAuthenticationTouchID : public EnrichedEventType {
+class EnrichedAuthenticationOD : public EnrichedAuthenticationWithInstigator {
+ public:
+  using EnrichedAuthenticationWithInstigator::
+      EnrichedAuthenticationWithInstigator;
+
+  EnrichedAuthenticationOD(EnrichedAuthenticationOD &&) = default;
+
+  audit_token_t AuthInstigatorToken() const override {
+    return es_msg_->event.authentication->data.od->instigator_token;
+  }
+};
+
+class EnrichedAuthenticationTouchID
+    : public EnrichedAuthenticationWithInstigator {
  public:
   EnrichedAuthenticationTouchID(
       Message &&es_msg, EnrichedProcess instigator,
+      std::optional<EnrichedProcess> auth_instigator,
       std::optional<std::shared_ptr<std::string>> username)
-      : EnrichedEventType(std::move(es_msg), std::move(instigator)),
+      : EnrichedAuthenticationWithInstigator(std::move(es_msg),
+                                             std::move(instigator),
+                                             std::move(auth_instigator)),
         username_(std::move(username)) {}
 
   EnrichedAuthenticationTouchID(EnrichedAuthenticationTouchID &&) = default;
+
+  audit_token_t AuthInstigatorToken() const override {
+    return es_msg_->event.authentication->data.token->instigator_token;
+  }
 
   const std::optional<std::shared_ptr<std::string>> &Username() const {
     return username_;
@@ -461,11 +498,17 @@ class EnrichedAuthenticationTouchID : public EnrichedEventType {
   std::optional<std::shared_ptr<std::string>> username_;
 };
 
-class EnrichedAuthenticationToken : public EnrichedEventType {
+class EnrichedAuthenticationToken
+    : public EnrichedAuthenticationWithInstigator {
  public:
-  using EnrichedEventType::EnrichedEventType;
+  using EnrichedAuthenticationWithInstigator::
+      EnrichedAuthenticationWithInstigator;
 
   EnrichedAuthenticationToken(EnrichedAuthenticationToken &&) = default;
+
+  audit_token_t AuthInstigatorToken() const override {
+    return es_msg_->event.authentication->data.touchid->instigator_token;
+  }
 };
 
 class EnrichedAuthenticationAutoUnlock : public EnrichedEventType {

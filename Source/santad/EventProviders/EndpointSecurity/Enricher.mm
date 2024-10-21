@@ -91,16 +91,19 @@ std::unique_ptr<EnrichedMessage> Enricher::Enrich(Message &&es_msg) {
       switch (es_msg->event.authentication->type) {
         case ES_AUTHENTICATION_TYPE_OD:
           return std::make_unique<EnrichedMessage>(
-            EnrichedAuthenticationOD(std::move(es_msg), Enrich(*es_msg->process)));
+            EnrichedAuthenticationOD(std::move(es_msg), Enrich(*es_msg->process),
+                                     Enrich(es_msg->event.authentication->data.od->instigator)));
         case ES_AUTHENTICATION_TYPE_TOUCHID:
           return std::make_unique<EnrichedMessage>(EnrichedAuthenticationTouchID(
             std::move(es_msg), Enrich(*es_msg->process),
+            Enrich(es_msg->event.authentication->data.touchid->instigator),
             es_msg->event.authentication->data.touchid->has_uid
               ? UsernameForUID(es_msg->event.authentication->data.touchid->uid.uid)
               : std::nullopt));
         case ES_AUTHENTICATION_TYPE_TOKEN:
-          return std::make_unique<EnrichedMessage>(
-            EnrichedAuthenticationToken(std::move(es_msg), Enrich(*es_msg->process)));
+          return std::make_unique<EnrichedMessage>(EnrichedAuthenticationToken(
+            std::move(es_msg), Enrich(*es_msg->process),
+            Enrich(es_msg->event.authentication->data.token->instigator)));
         case ES_AUTHENTICATION_TYPE_AUTO_UNLOCK:
           return std::make_unique<EnrichedMessage>(EnrichedAuthenticationAutoUnlock(
             std::move(es_msg), Enrich(*es_msg->process),
@@ -154,6 +157,11 @@ std::unique_ptr<EnrichedMessage> Enricher::Enrich(Message &&es_msg) {
       LOGE(@"Attempting to enrich an unhandled event type: %d", es_msg->event_type);
       exit(EXIT_FAILURE);
   }
+}
+
+std::optional<EnrichedProcess> Enricher::Enrich(const es_process_t *es_proc,
+                                                EnrichOptions options) {
+  return es_proc ? std::make_optional<EnrichedProcess>(Enrich(*es_proc, options)) : std::nullopt;
 }
 
 EnrichedProcess Enricher::Enrich(const es_process_t &es_proc, EnrichOptions options) {

@@ -153,11 +153,17 @@ static inline void AppendUserGroup(std::string &str, const audit_token_t &tok,
   str.append(group.has_value() ? group->get()->c_str() : "(null)");
 }
 
+static inline void AppendInstigator(std::string &str, const es_process_t *es_proc,
+                                    const EnrichedProcess &enriched_proc,
+                                    const std::string prefix = "") {
+  AppendProcess(str, es_proc, prefix);
+  AppendUserGroup(str, es_proc->audit_token, enriched_proc.real_user(), enriched_proc.real_group(),
+                  prefix);
+}
+
 static inline void AppendInstigator(std::string &str, const EnrichedEventType &event,
                                     const std::string prefix = "") {
-  AppendProcess(str, event->process, prefix);
-  AppendUserGroup(str, event->process->audit_token, event.instigator().real_user(),
-                  event.instigator().real_group(), prefix);
+  AppendInstigator(str, event->process, event.instigator(), prefix);
 }
 
 #if HAVE_MACOS_13
@@ -632,12 +638,12 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedLoginLogout &ms
   return FinalizeString(str);
 }
 
-void AppendAuthInstigatorOrFallback(std::string &str, uint32_t msg_version,
-                                    const es_process_t *instigator_proc,
-                                    const audit_token_t &instigator_token) {
-  if (instigator_proc) {
-    AppendProcess(str, instigator_proc, "auth_");
-    AppendUserGroup(str, instigator_proc->audit_token, std::nullopt, std::nullopt, "auth_");
+static void AppendAuthInstigatorOrFallback(
+  std::string &str, uint32_t msg_version, const es_process_t *instigator_proc,
+  const audit_token_t &instigator_token,
+  const std::optional<EnrichedProcess> &enriched_instigator_proc) {
+  if (instigator_proc && enriched_instigator_proc.has_value()) {
+    AppendInstigator(str, instigator_proc, enriched_instigator_proc.value(), "auth_");
   } else if (msg_version >= 8) {
     str.append("|auth_pid=");
     str.append(std::to_string(Pid(instigator_token)));
@@ -656,7 +662,8 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedAuthenticationO
   AppendInstigator(str, msg);
 
   AppendAuthInstigatorOrFallback(str, msg->version, msg->event.authentication->data.od->instigator,
-                                 msg->event.authentication->data.od->instigator_token);
+                                 msg->event.authentication->data.od->instigator_token,
+                                 msg.AuthInstigator());
 
   str.append("|record_type=");
   str.append(msg->event.authentication->data.od->record_type.data);
@@ -691,9 +698,9 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedAuthenticationT
 
   AppendInstigator(str, msg);
 
-  AppendAuthInstigatorOrFallback(str, msg->version,
-                                 msg->event.authentication->data.touchid->instigator,
-                                 msg->event.authentication->data.touchid->instigator_token);
+  AppendAuthInstigatorOrFallback(
+    str, msg->version, msg->event.authentication->data.touchid->instigator,
+    msg->event.authentication->data.touchid->instigator_token, msg.AuthInstigator());
 
   str.append("|touchid_mode=");
   str.append(
@@ -715,9 +722,9 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedAuthenticationT
 
   AppendInstigator(str, msg);
 
-  AppendAuthInstigatorOrFallback(str, msg->version,
-                                 msg->event.authentication->data.token->instigator,
-                                 msg->event.authentication->data.token->instigator_token);
+  AppendAuthInstigatorOrFallback(
+    str, msg->version, msg->event.authentication->data.token->instigator,
+    msg->event.authentication->data.token->instigator_token, msg.AuthInstigator());
 
   str.append("|pubkey_hash=");
   str.append(msg->event.authentication->data.token->pubkey_hash.data);
@@ -753,7 +760,8 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedAuthenticationA
   AppendEventUser(str, msg->event.authentication->data.auto_unlock->username, msg.UID());
 
   str.append("|type=");
-  str.append(GetAuthenticationAutoUnlockTypeString(msg->event.authentication->data.auto_unlock->type));
+  str.append(
+    GetAuthenticationAutoUnlockTypeString(msg->event.authentication->data.auto_unlock->type));
 
   return FinalizeString(str);
 }
