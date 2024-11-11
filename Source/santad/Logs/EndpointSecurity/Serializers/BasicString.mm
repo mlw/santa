@@ -638,17 +638,30 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedLoginLogout &ms
   return FinalizeString(str);
 }
 
-static void AppendAuthInstigatorOrFallback(
-  std::string &str, uint32_t msg_version, const es_process_t *instigator_proc,
-  const audit_token_t &instigator_token,
-  const std::optional<EnrichedProcess> &enriched_instigator_proc) {
-  if (instigator_proc && enriched_instigator_proc.has_value()) {
-    AppendInstigator(str, instigator_proc, enriched_instigator_proc.value(), "auth_");
-  } else if (msg_version >= 8) {
+// static void AppendAuthInstigatorOrFallback(
+//   std::string &str, uint32_t msg_version, const es_process_t *instigator_proc,
+//   const audit_token_t &instigator_token,
+//   const std::optional<EnrichedProcess> &enriched_instigator_proc) {
+//   if (instigator_proc && enriched_instigator_proc.has_value()) {
+//     AppendInstigator(str, instigator_proc, enriched_instigator_proc.value(), "auth_");
+//   } else if (msg_version >= 8) {
+//     str.append("|auth_pid=");
+//     str.append(std::to_string(Pid(instigator_token)));
+//     str.append("|auth_pidver=");
+//     str.append(std::to_string(Pidversion(instigator_token)));
+//   }
+// }
+
+static void AppendAuthInstigatorOrFallback(std::string &str,
+                                           const EnrichedAuthenticationWithInstigator &auth_event) {
+  if (auth_event.AuthInstigator() && auth_event.EnrichedAuthInstigator().has_value()) {
+    AppendInstigator(str, auth_event.AuthInstigator(), auth_event.EnrichedAuthInstigator().value(),
+                     "auth_");
+  } else if (auth_event->version >= 8) {
     str.append("|auth_pid=");
-    str.append(std::to_string(Pid(instigator_token)));
+    str.append(std::to_string(Pid(auth_event.AuthInstigatorToken().value())));
     str.append("|auth_pidver=");
-    str.append(std::to_string(Pidversion(instigator_token)));
+    str.append(std::to_string(Pidversion(auth_event.AuthInstigatorToken().value())));
   }
 }
 
@@ -661,9 +674,11 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedAuthenticationO
 
   AppendInstigator(str, msg);
 
-  AppendAuthInstigatorOrFallback(str, msg->version, msg->event.authentication->data.od->instigator,
-                                 msg->event.authentication->data.od->instigator_token,
-                                 msg.AuthInstigator());
+  // AppendAuthInstigatorOrFallback(str, msg->version,
+  // msg->event.authentication->data.od->instigator,
+  //                                msg->event.authentication->data.od->instigator_token,
+  //                                msg.AuthInstigator());
+  AppendAuthInstigatorOrFallback(str, msg);
 
   str.append("|record_type=");
   str.append(msg->event.authentication->data.od->record_type.data);
@@ -698,9 +713,10 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedAuthenticationT
 
   AppendInstigator(str, msg);
 
-  AppendAuthInstigatorOrFallback(
-    str, msg->version, msg->event.authentication->data.touchid->instigator,
-    msg->event.authentication->data.touchid->instigator_token, msg.AuthInstigator());
+  AppendAuthInstigatorOrFallback(str, msg);
+  // AppendAuthInstigatorOrFallback(
+  //   str, msg->version, msg->event.authentication->data.touchid->instigator,
+  //   msg->event.authentication->data.touchid->instigator_token, msg.AuthInstigator());
 
   str.append("|touchid_mode=");
   str.append(
@@ -722,9 +738,7 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedAuthenticationT
 
   AppendInstigator(str, msg);
 
-  AppendAuthInstigatorOrFallback(
-    str, msg->version, msg->event.authentication->data.token->instigator,
-    msg->event.authentication->data.token->instigator_token, msg.AuthInstigator());
+  AppendAuthInstigatorOrFallback(str, msg);
 
   str.append("|pubkey_hash=");
   str.append(msg->event.authentication->data.token->pubkey_hash.data);

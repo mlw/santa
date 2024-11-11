@@ -26,6 +26,7 @@
 #include <string>
 #include <variant>
 
+#include "Source/common/Platform.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Message.h"
 #include "Source/santad/ProcessTree/process_tree.pb.h"
 
@@ -442,22 +443,24 @@ class EnrichedAuthenticationWithInstigator : public EnrichedEventType {
  public:
   EnrichedAuthenticationWithInstigator(
       Message &&es_msg, EnrichedProcess instigator,
-      std::optional<EnrichedProcess> auth_instigator)
+      std::optional<EnrichedProcess> enriched_auth_instigator)
       : EnrichedEventType(std::move(es_msg), std::move(instigator)),
-        auth_instigator_(std::move(auth_instigator)) {}
+        enriched_auth_instigator_(std::move(enriched_auth_instigator)) {}
+
   virtual ~EnrichedAuthenticationWithInstigator() = default;
 
   EnrichedAuthenticationWithInstigator(
       EnrichedAuthenticationWithInstigator &&) = default;
 
-  virtual audit_token_t AuthInstigatorToken() const = 0;
+  virtual const es_process_t *AuthInstigator() const = 0;
+  virtual std::optional<audit_token_t> AuthInstigatorToken() const = 0;
 
-  const std::optional<EnrichedProcess> &AuthInstigator() const {
-    return auth_instigator_;
+  const std::optional<EnrichedProcess> &EnrichedAuthInstigator() const {
+    return enriched_auth_instigator_;
   }
 
  private:
-  std::optional<EnrichedProcess> auth_instigator_;
+  std::optional<EnrichedProcess> enriched_auth_instigator_;
 };
 
 class EnrichedAuthenticationOD : public EnrichedAuthenticationWithInstigator {
@@ -467,8 +470,23 @@ class EnrichedAuthenticationOD : public EnrichedAuthenticationWithInstigator {
 
   EnrichedAuthenticationOD(EnrichedAuthenticationOD &&) = default;
 
-  audit_token_t AuthInstigatorToken() const override {
-    return es_msg_->event.authentication->data.od->instigator_token;
+  const es_process_t *AuthInstigator() const override {
+#if HAVE_MACOS_13
+    return es_msg_->event.authentication->data.od->instigator;
+#else
+    return nullptr;
+#endif
+  }
+
+  std::optional<audit_token_t> AuthInstigatorToken() const override {
+#if HAVE_MACOS_15
+    return es_msg_->version >= 8
+               ? std::make_optional<audit_token_t>(
+                     es_msg_->event.authentication->data.od->instigator_token)
+               : std::nullopt;
+#else
+    return std::nullopt;
+#endif
   }
 };
 
@@ -486,8 +504,23 @@ class EnrichedAuthenticationTouchID
 
   EnrichedAuthenticationTouchID(EnrichedAuthenticationTouchID &&) = default;
 
-  audit_token_t AuthInstigatorToken() const override {
-    return es_msg_->event.authentication->data.token->instigator_token;
+  const es_process_t *AuthInstigator() const override {
+#if HAVE_MACOS_13
+    return es_msg_->event.authentication->data.touchid->instigator;
+#else
+    return nullptr;
+#endif
+  }
+
+  std::optional<audit_token_t> AuthInstigatorToken() const override {
+#if HAVE_MACOS_15
+    return es_msg_->version >= 8 ? std::make_optional<audit_token_t>(
+                                       es_msg_->event.authentication->data
+                                           .touchid->instigator_token)
+                                 : std::nullopt;
+#else
+    return std::nullopt;
+#endif
   }
 
   const std::optional<std::shared_ptr<std::string>> &Username() const {
@@ -506,8 +539,23 @@ class EnrichedAuthenticationToken
 
   EnrichedAuthenticationToken(EnrichedAuthenticationToken &&) = default;
 
-  audit_token_t AuthInstigatorToken() const override {
-    return es_msg_->event.authentication->data.touchid->instigator_token;
+  const es_process_t *AuthInstigator() const override {
+#if HAVE_MACOS_13
+    return es_msg_->event.authentication->data.token->instigator;
+#else
+    return nullptr;
+#endif
+  }
+
+  std::optional<audit_token_t> AuthInstigatorToken() const override {
+#if HAVE_MACOS_15
+    return es_msg_->version >= 8 ? std::make_optional<audit_token_t>(
+                                       es_msg_->event.authentication->data
+                                           .token->instigator_token)
+                                 : std::nullopt;
+#else
+    return std::nullopt;
+#endif
   }
 };
 

@@ -97,6 +97,12 @@ static inline void EncodeString(std::function<std::string *()> lazy_f, std::stri
   }
 }
 
+static inline void EncodeStringToken(std::function<std::string *()> lazy_f, es_string_token_t tok) {
+  if (tok.length > 0) {
+    lazy_f()->append(StringTokenToStringView(tok));
+  }
+}
+
 static inline void EncodeUserInfo(::pbv1::UserInfo *pb_user_info, uid_t uid,
                                   const std::optional<std::shared_ptr<std::string>> &name) {
   pb_user_info->set_uid(uid);
@@ -106,13 +112,18 @@ static inline void EncodeUserInfo(::pbv1::UserInfo *pb_user_info, uid_t uid,
 }
 
 static inline void EncodeUserInfo(std::function<::pbv1::UserInfo *()> lazy_f,
-                                  std::optional<uid_t> uid, const es_string_token_t &name) {
+                                  std::optional<uid_t> uid, const std::string_view &name) {
   if (uid.has_value()) {
     lazy_f()->set_uid(uid.value());
   }
-  if (name.length > 0) {
-    lazy_f()->set_name(name.data, name.length);
+  if (name.length() > 0) {
+    lazy_f()->set_name(name.data(), name.length());
   }
+}
+
+static inline void EncodeUserInfo(std::function<::pbv1::UserInfo *()> lazy_f,
+                                  std::optional<uid_t> uid, const es_string_token_t &name) {
+  EncodeUserInfo(std::move(lazy_f), std::move(uid), StringTokenToStringView(name));
 }
 
 static inline void EncodeGroupInfo(::pbv1::GroupInfo *pb_group_info, gid_t gid,
@@ -946,12 +957,92 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedLoginLogout &msg) 
   return FinalizeProto(santa_msg);
 }
 
+// static void EncodeAuthInstigatorOrFallback(
+//   uint32_t msg_version, const es_process_t *instigator_proc,
+//   const audit_token_t &instigator_token,
+//   const std::optional<EnrichedProcess> &enriched_instigator_proc,
+//   std::function<::pbv1::ProcessInfoLight *()> lazy_auth_instigator_f,
+//   std::function<::pbv1::ProcessID *()> lazy_auth_instigator_fallback_f) {
+//   if (instigator_proc && enriched_instigator_proc.has_value()) {
+//     EncodeProcessInfoLight(pb_od->mutable_process(), instigator_proc,
+//                            enriched_instigator_proc.value());
+//   } else if (msg->version >= 8) {
+//     ::pbv1::ProcessID *pb_proc_id = pb_od->mutable_fallback_id();
+//     pb_proc_id->set_pid(Pid(msg.AuthInstigatorToken()));
+//     pb_proc_id->set_pidversion(Pidversion(msg.AuthInstigatorToken()));
+//   }
+// }
+
+static void EncodeAuthInstigatorOrFallback(
+  const EnrichedAuthenticationWithInstigator &auth_event,
+  std::function<::pbv1::ProcessInfoLight *()> lazy_auth_instigator_f,
+  std::function<::pbv1::ProcessID *()> lazy_auth_instigator_fallback_f) {
+  if (auth_event.AuthInstigator() && auth_event.EnrichedAuthInstigator().has_value()) {
+    EncodeProcessInfoLight(lazy_auth_instigator_f(), auth_event.AuthInstigator(),
+                           auth_event.EnrichedAuthInstigator().value());
+  } else if (auth_event.AuthInstigatorToken().has_value()) {
+    ::pbv1::ProcessID *pb_proc_id = lazy_auth_instigator_fallback_f();
+    audit_token_t fallback_tok = auth_event.AuthInstigatorToken().value();
+    pb_proc_id->set_pid(Pid(fallback_tok));
+    pb_proc_id->set_pidversion(Pidversion(fallback_tok));
+  }
+}
+
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedAuthenticationOD &msg) {
-  return {};
+  Arena arena;
+  ::pbv1::SantaMessage *santa_msg = CreateDefaultProto(&arena, msg);
+
+  ::pbv1::Authentication *pb_auth = santa_msg->mutable_authentication();
+  pb_auth->set_success(msg->event.authentication->success);
+
+  ::pbv1::AuthenticationOD *pb_od = pb_auth->mutable_authentication_od();
+
+  es_event_authentication_od_t *es_od_event = msg->event.authentication->data.od;
+  EncodeProcessInfoLight(pb_od->mutable_instigator(), msg);
+
+  EncodeAuthInstigatorOrFallback(
+    msg, [pb_od] { return pb_od->mutable_process(); },
+    [pb_od] { return pb_od->mutable_fallback_id(); });
+
+  EncodeStringToken([pb_od] { return pb_od->mutable_record_type(); }, es_od_event->record_type);
+  EncodeStringToken([pb_od] { return pb_od->mutable_record_name(); }, es_od_event->record_name);
+  EncodeStringToken([pb_od] { return pb_od->mutable_node_name(); }, es_od_event->node_name);
+  EncodeStringToken([pb_od] { return pb_od->mutable_db_path(); }, es_od_event->db_path);
+
+  return FinalizeProto(santa_msg);
+}
+
+::pbv1::AuthenticationTouchID::Mode GetTouchIDMode(es_touchid_mode_t mode) {
+  switch (mode) {
+    case ES_TOUCHID_MODE_VERIFICATION: return ::pbv1::AuthenticationTouchID::MODE_VERIFICATION;
+    case ES_TOUCHID_MODE_IDENTIFICATION: return ::pbv1::AuthenticationTouchID::MODE_IDENTIFICATION;
+    default: return ::pbv1::AuthenticationTouchID::MODE_UNKNOWN;
+  }
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedAuthenticationTouchID &msg) {
-  return {};
+  Arena arena;
+  ::pbv1::SantaMessage *santa_msg = CreateDefaultProto(&arena, msg);
+
+  ::pbv1::Authentication *pb_auth = santa_msg->mutable_authentication();
+  pb_auth->set_success(msg->event.authentication->success);
+
+  ::pbv1::AuthenticationTouchID *pb_tid = pb_auth->mutable_authentication_touch_id();
+
+  EncodeProcessInfoLight(pb_tid->mutable_instigator(), msg);
+  EncodeAuthInstigatorOrFallback(
+    msg, [pb_tid] { return pb_tid->mutable_process(); },
+    [pb_tid] { return pb_tid->mutable_fallback_id(); });
+
+  es_event_authentication_touchid_t *es_tid_event = msg->event.authentication->data.touchid;
+
+  pb_tid->set_mode(GetTouchIDMode(es_tid_event->touchid_mode));
+
+  EncodeUserInfo([pb_tid] { return pb_tid->mutable_user(); },
+                 es_tid_event->has_uid ? std::make_optional(es_tid_event->uid.uid) : std::nullopt,
+                 msg.Username().has_value() ? *msg.Username().value() : std::string_view());
+
+  return FinalizeProto(santa_msg);
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedAuthenticationToken &msg) {
