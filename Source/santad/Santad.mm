@@ -153,6 +153,21 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
       };
   }
 
+  SNTEndpointSecurityProcessFileAccessAuthorizer *process_access_authorizer_client;
+  if (@available(macOS 13.0, *)) {
+    process_access_authorizer_client = [[SNTEndpointSecurityProcessFileAccessAuthorizer alloc]
+      initWithESAPI:esapi
+            metrics:metrics
+             logger:logger
+         watchItems:watch_items
+           enricher:enricher
+      decisionCache:[SNTDecisionCache sharedCache]
+          ttyWriter:tty_writer];
+
+    LOGE(@"REGISTER PROBER!");
+    [authorizer_client registerProcessWatcherProbe:process_access_authorizer_client];
+  }
+
   EstablishSyncServiceConnection(syncd_queue);
 
   NSMutableArray<SNTKVOManager *> *kvoObservers = [[NSMutableArray alloc] init];
@@ -457,6 +472,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
   }
   [monitor_client enable];
   [device_client enable];
+  [process_access_authorizer_client enable];
 
   [[NSRunLoop mainRunLoop] run];
 }

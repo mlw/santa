@@ -50,6 +50,8 @@
 - (bool)unsubscribeAll;
 - (bool)unmuteAllTargetPaths;
 - (bool)enableTargetPathWatching;
+- (bool)enableProcessWatching;
+- (bool)muteProcess:(const audit_token_t *)tok;
 - (bool)muteTargetPaths:
   (const std::vector<std::pair<std::string, santa::WatchItemPathType>> &)paths;
 - (bool)unmuteTargetPaths:

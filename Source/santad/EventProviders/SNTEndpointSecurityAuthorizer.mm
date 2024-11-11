@@ -34,6 +34,7 @@ using santa::Message;
 @interface SNTEndpointSecurityAuthorizer ()
 @property SNTCompilerController *compilerController;
 @property SNTExecutionController *execController;
+@property id<SNTEndpointSecurityProcessWatcherProbe> procWatcherProbe;
 @end
 
 @implementation SNTEndpointSecurityAuthorizer {
@@ -62,6 +63,19 @@ using santa::Message;
   return @"Authorizer";
 }
 
+- (bool)respondToMessage:(const santa::Message &)msg withAuthResult:(es_auth_result_t)result {
+  bool cacheable = (result == ES_AUTH_RESULT_ALLOW);
+
+  if (self.procWatcherProbe) {
+    bool probe = [self.procWatcherProbe probeMessage:msg];
+
+    LOGE(@"GOT PROBE RESPONSE: %d", probe);
+    cacheable = !probe;
+  }
+
+  return [self respondToMessage:msg withAuthResult:result cacheable:cacheable];
+}
+
 - (void)processMessage:(const Message &)msg {
   const es_file_t *targetFile = msg->event.exec.target->executable;
 
@@ -78,9 +92,7 @@ using santa::Message;
         default: break;
       }
 
-      [self respondToMessage:msg
-              withAuthResult:authResult
-                   cacheable:(authResult == ES_AUTH_RESULT_ALLOW)];
+      [self respondToMessage:msg withAuthResult:authResult];
       return;
     } else if (returnAction == SNTActionRequestBinary) {
       // TODO(mlw): Add a metric here to observe how ofthen this happens in practice.
@@ -145,9 +157,11 @@ using santa::Message;
   // update made the executable allowable, ES would continue to apply the DENY
   // cached result. Note however that the local AuthResultCache will cache
   // DENY results.
-  return [self respondToMessage:esMsg
-                 withAuthResult:authResult
-                      cacheable:(authResult == ES_AUTH_RESULT_ALLOW)];
+  return [self respondToMessage:esMsg withAuthResult:authResult];
+}
+
+- (void)registerProcessWatcherProbe:(id<SNTEndpointSecurityProcessWatcherProbe>)procWatcherProbe {
+  self.procWatcherProbe = procWatcherProbe;
 }
 
 - (void)enable {

@@ -14,6 +14,8 @@
 /// limitations under the License.
 
 #import "Source/santad/EventProviders/SNTEndpointSecurityFileAccessAuthorizer.h"
+#include <string_view>
+#include "Source/common/SNTLogging.h"
 
 #include <EndpointSecurity/EndpointSecurity.h>
 #include <Kernel/kern/cs_blobs.h>
@@ -880,6 +882,96 @@ bool ShouldMessageTTY(const std::shared_ptr<WatchItemPolicy> &policy, const Mess
   }
 
   self->_readsCache.Clear();
+}
+
+@end
+
+@interface SNTEndpointSecurityProcessFileAccessAuthorizer ()
+@property SNTConfigurator *configurator;
+@property SNTDecisionCache *decisionCache;
+@property bool isSubscribed;
+@end
+
+@implementation SNTEndpointSecurityProcessFileAccessAuthorizer {
+  std::shared_ptr<Logger> _logger;
+  std::shared_ptr<WatchItems> _watchItems;
+  std::shared_ptr<Enricher> _enricher;
+  std::shared_ptr<RateLimiter> _rateLimiter;
+  SantaCache<SantaVnode, NSString *> _certHashCache;
+  std::shared_ptr<TTYWriter> _ttyWriter;
+  ProcessSet<std::pair<dev_t, ino_t>> _readsCache;
+  ProcessSet<std::pair<std::string, std::string>> _ttyMessageCache;
+  std::shared_ptr<Metrics> _metrics;
+}
+
+- (instancetype)initWithESAPI:(std::shared_ptr<santa::EndpointSecurityAPI>)esApi
+                      metrics:(std::shared_ptr<Metrics>)metrics
+                       logger:(std::shared_ptr<santa::Logger>)logger
+                   watchItems:(std::shared_ptr<WatchItems>)watchItems
+                     enricher:(std::shared_ptr<santa::Enricher>)enricher
+                decisionCache:(SNTDecisionCache *)decisionCache
+                    ttyWriter:(std::shared_ptr<santa::TTYWriter>)ttyWriter {
+  self = [super initWithESAPI:std::move(esApi)
+                      metrics:metrics
+                    processor:santa::Processor::kFileAccessAuthorizer];
+  if (self) {
+    _watchItems = std::move(watchItems);
+    _logger = std::move(logger);
+    _enricher = std::move(enricher);
+    _decisionCache = decisionCache;
+    _ttyWriter = std::move(ttyWriter);
+    _metrics = std::move(metrics);
+
+    _configurator = [SNTConfigurator configurator];
+
+    _rateLimiter =
+      RateLimiter::Create(_metrics, santa::Processor::kFileAccessAuthorizer, kDefaultRateLimitQPS);
+
+    [self establishClientOrDie];
+
+    [super enableProcessWatching];
+  }
+  return self;
+}
+
+- (void)handleMessage:(santa::Message &&)esMsg
+   recordEventMetrics:(void (^)(EventDisposition))recordEventMetrics {
+  // LOGE(@"GOT PROC FAA EVENT: %d: %s: %s", esMsg->event_type,
+  // esMsg->process->executable->path.data);
+  switch (esMsg->event_type) {
+    case ES_EVENT_TYPE_AUTH_OPEN:
+      LOGE(@"PROC FAA: %d: %s: %s", esMsg->event_type, esMsg->process->executable->path.data,
+           esMsg->event.open.file->path.data);
+      // LOGE(@"  OPEN: %s", esMsg->event.open.file->path.data);
+      break;
+    default: LOGE(@"UNHANDLED EVENT TYPE: %d", esMsg->event_type);
+  }
+
+  if (esMsg->action_type == ES_ACTION_TYPE_AUTH) {
+    [self respondToMessage:esMsg withAuthResult:ES_AUTH_RESULT_ALLOW cacheable:false];
+  }
+}
+
+- (bool)probeMessage:(const santa::Message &)esMsg {
+  static constexpr std::string_view sidBsdtar = "com.apple.bsdtar";
+  const es_process_t *targetProc = esMsg->event.exec.target;
+  if (targetProc->is_platform_binary && targetProc->signing_id.length > 0 &&
+      strcmp(targetProc->signing_id.data, sidBsdtar.data()) == 0) {
+    LOGE(@"FOUND BSD TAR WOOP");
+    [super muteProcess:&targetProc->audit_token];
+    return true;
+  } else {
+    return false;
+  }
+}
+
+- (void)enable {
+  std::set<es_event_type_t> events = {
+    ES_EVENT_TYPE_AUTH_OPEN,
+    // ES_EVENT_TYPE_AUTH_TRUNCATE,
+  };
+
+  [super subscribeAndClearCache:std::move(events)];
 }
 
 @end

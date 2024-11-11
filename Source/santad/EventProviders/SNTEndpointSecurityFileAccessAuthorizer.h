@@ -44,3 +44,16 @@ typedef void (^SNTFileAccessBlockCallback)(SNTFileAccessEvent *event, NSString *
 @property SNTFileAccessBlockCallback fileAccessBlockCallback;
 
 @end
+
+@interface SNTEndpointSecurityProcessFileAccessAuthorizer
+    : SNTEndpointSecurityClient <SNTEndpointSecurityProcessWatcherProbe>
+
+- (instancetype)initWithESAPI:(std::shared_ptr<santa::EndpointSecurityAPI>)esApi
+                      metrics:(std::shared_ptr<santa::Metrics>)metrics
+                       logger:(std::shared_ptr<santa::Logger>)logger
+                   watchItems:(std::shared_ptr<santa::WatchItems>)watchItems
+                     enricher:(std::shared_ptr<santa::Enricher>)enricher
+                decisionCache:(SNTDecisionCache *)decisionCache
+                    ttyWriter:(std::shared_ptr<santa::TTYWriter>)ttyWriter;
+
+@end

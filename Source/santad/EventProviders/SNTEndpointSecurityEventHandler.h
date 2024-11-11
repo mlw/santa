@@ -50,3 +50,9 @@
              (const std::vector<std::pair<std::string, santa::WatchItemPathType>> &)removedPaths;
 
 @end
+
+@protocol SNTEndpointSecurityProcessWatcherProbe <SNTEndpointSecurityEventHandler>
+
+- (bool)probeMessage:(const santa::Message &)esMsg;
+
+@end

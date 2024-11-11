@@ -33,4 +33,6 @@
            compilerController:(SNTCompilerController *)compilerController
               authResultCache:(std::shared_ptr<santa::AuthResultCache>)authResultCache;
 
+- (void)registerProcessWatcherProbe:(id<SNTEndpointSecurityProcessWatcherProbe>)procWatcherProbe;
+
 @end
