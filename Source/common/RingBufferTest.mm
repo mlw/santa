@@ -34,7 +34,7 @@ using santa::RingBuffer;
   XCTAssertFalse(rb.Dequeue().has_value());
 
   // Add an item to the ring
-  rb.Enqueue(1);
+  XCTAssertFalse(rb.Enqueue(1));
 
   // The ring is now not empty, but still not full
   XCTAssertFalse(rb.Empty());
@@ -51,7 +51,7 @@ using santa::RingBuffer;
 
   // Ensure this works for non-rvalues
   int x = 2;
-  rb.Enqueue(x);
+  XCTAssertFalse(rb.Enqueue(x));
   res = rb.Dequeue();
   XCTAssertTrue(res.has_value());
   XCTAssertEqual(res.value(), 2);
@@ -60,14 +60,14 @@ using santa::RingBuffer;
   XCTAssertTrue(rb.Empty());
 
   // Fill up the ring
-  rb.Enqueue(3);
-  rb.Enqueue(4);
-  rb.Enqueue(5);
+  XCTAssertFalse(rb.Enqueue(3));
+  XCTAssertFalse(rb.Enqueue(4));
+  XCTAssertFalse(rb.Enqueue(5));
 
   XCTAssertTrue(rb.Full());
 
   // Add another item to overwrite the oldest item in the queue
-  rb.Enqueue(6);
+  XCTAssertTrue(rb.Enqueue(6));
   XCTAssertTrue(rb.Full());
 
   // Drain the queue and ensure proper values
@@ -89,7 +89,7 @@ using santa::RingBuffer;
   XCTAssertFalse(rb.Full());
 
   // Add an object and check ring state
-  rb.Enqueue(@"foo");
+  XCTAssertFalse(rb.Enqueue(@"foo"));
   XCTAssertFalse(rb.Full());
   XCTAssertFalse(rb.Empty());
 
@@ -99,12 +99,12 @@ using santa::RingBuffer;
   // Add an object within a new scope to ensure the ring properly holds onto the object
   @autoreleasepool {
     NSString *pidStr = [NSString stringWithFormat:@"pid: %d", getpid()];
-    rb.Enqueue([pidStr copy]);
+    XCTAssertFalse(rb.Enqueue([pidStr copy]));
     pidStr = nil;
   }
 
   NSString *str = @"bar";
-  rb.Enqueue(str);
+  XCTAssertFalse(rb.Enqueue(str));
 
   XCTAssertTrue(rb.Full());
   XCTAssertFalse(rb.Empty());
