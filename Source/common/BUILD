@@ -181,6 +181,19 @@ objc_library(
 )
 
 objc_library(
+    name = "RingBuffer",
+    hdrs = ["RingBuffer.h"],
+    deps = [
+    ],
+)
+
+santa_unit_test(
+    name = "RingBufferTest",
+    srcs = ["RingBufferTest.mm"],
+    deps = [":RingBuffer"],
+)
+
+objc_library(
     name = "TelemetryEventMap",
     srcs = ["TelemetryEventMap.mm"],
     hdrs = ["TelemetryEventMap.h"],
@@ -556,6 +569,7 @@ test_suite(
     tests = [
         ":EncodeEntitlementsTest",
         ":PrefixTreeTest",
+        ":RingBufferTest",
         ":SNTBlockMessageTest",
         ":SNTCachedDecisionTest",
         ":SNTConfiguratorTest",
