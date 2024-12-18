@@ -13,9 +13,14 @@
 ///    limitations under the License.
 
 #import "Source/santad/SNTNotificationQueue.h"
+#include <Foundation/Foundation.h>
 
+#import <dispatch/dispatch.h>
 #import <MOLXPCConnection/MOLXPCConnection.h>
 
+#include <memory>
+
+#import "Source/common/RingBuffer.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTStoredEvent.h"
 #import "Source/common/SNTXPCNotifierInterface.h"
@@ -23,15 +28,19 @@
 static const int kMaximumNotifications = 10;
 
 @interface SNTNotificationQueue ()
-@property NSMutableArray *pendingNotifications;
+@property dispatch_queue_t pendingQueue;
 @end
 
-@implementation SNTNotificationQueue
+@implementation SNTNotificationQueue {
+  std::unique_ptr<santa::RingBuffer<id>> _pendingNotifications;
+}
 
 - (instancetype)init {
   self = [super init];
   if (self) {
-    _pendingNotifications = [NSMutableArray array];
+    _pendingQueue = dispatch_queue_create("com.northpolesec.santa.daemon.SNTNotificationQueue", DISPATCH_QUEUE_SERIAL);
+
+    _pendingNotifications = std::make_unique<santa::RingBuffer<id>>(kMaximumNotifications);
   }
   return self;
 }
@@ -44,54 +53,56 @@ static const int kMaximumNotifications = 10;
     if (reply) reply(NO);
     return;
   }
-  if (self.pendingNotifications.count > kMaximumNotifications) {
-    LOGI(@"Pending GUI notification count is over %d, dropping.", kMaximumNotifications);
-    if (reply) reply(NO);
+
+  NSMutableDictionary *d = [NSMutableDictionary dictionary];
+  [d setValue:event forKey:@"event"];
+  [d setValue:message forKey:@"message"];
+  [d setValue:url forKey:@"url"];
+  // Copy the block to the heap so it can be called later.
+  //
+  // This is necessary because the block is allocated on the stack in the
+  // Execution controller which goes out of scope.
+  [d setValue:[reply copy] forKey:@"reply"];
+
+  dispatch_sync(self.pendingQueue, ^{
+    NSDictionary *msg = _pendingNotifications->Enqueue(d).value_or(nil);
+
+    if (msg != nil) {
+      LOGI(@"Pending GUI notification count is over %d, dropping oldest notification.", kMaximumNotifications);
+      void (^replyBlock)(BOOL) = d[@"reply"];
+      if (replyBlock) {
+        replyBlock(NO);
+      }
+    }
+
+    [self flushQueueLocked];
+  });
+}
+
+- (void)flushQueueLocked {
+  id rop = [self.notifierConnection remoteObjectProxy];
+  if (!rop) {
     return;
   }
 
-  NSMutableDictionary *d = [@{@"event" : event} mutableCopy];
-  if (message) {
-    d[@"message"] = message;
-  }
-  if (url) {
-    d[@"url"] = url;
-  }
-
-  if (reply) {
-    // Copy the block to the heap so it can be called later.
-    //
-    // This is necessary because the block is allocated on the stack in the
-    // Execution controller which goes out of scope.
-    d[@"reply"] = [reply copy];
-  }
-
-  @synchronized(self.pendingNotifications) {
-    [self.pendingNotifications addObject:d];
-  }
-  [self flushQueue];
-}
-
-- (void)flushQueue {
-  id rop = [self.notifierConnection remoteObjectProxy];
-  if (!rop) return;
-
-  @synchronized(self.pendingNotifications) {
-    NSMutableArray *postedNotifications = [NSMutableArray array];
-    for (NSDictionary *d in self.pendingNotifications) {
-      [rop postBlockNotification:d[@"event"]
-               withCustomMessage:d[@"message"]
-                       customURL:d[@"url"]
-                        andReply:d[@"reply"]];
-      [postedNotifications addObject:d];
+  while (!_pendingNotifications->Empty()) {
+    NSDictionary *d = _pendingNotifications->Dequeue().value_or(nil);
+    if (!d) {
+      return;
     }
-    [self.pendingNotifications removeObjectsInArray:postedNotifications];
+
+    [rop postBlockNotification:d[@"event"]
+             withCustomMessage:d[@"message"]
+                     customURL:d[@"url"]
+                      andReply:d[@"reply"]];
   }
 }
 
 - (void)setNotifierConnection:(MOLXPCConnection *)notifierConnection {
   _notifierConnection = notifierConnection;
-  [self flushQueue];
+  dispatch_sync(self.pendingQueue, ^{
+    [self flushQueueLocked];
+  });
 }
 
 @end
