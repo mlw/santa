@@ -34,7 +34,7 @@ using santa::RingBuffer;
   XCTAssertFalse(rb.Dequeue().has_value());
 
   // Add an item to the ring
-  XCTAssertFalse(rb.Enqueue(1));
+  XCTAssertEqual(rb.Enqueue(1), std::nullopt);
 
   // The ring is now not empty, but still not full
   XCTAssertFalse(rb.Empty());
@@ -51,23 +51,25 @@ using santa::RingBuffer;
 
   // Ensure this works for non-rvalues
   int x = 2;
-  XCTAssertFalse(rb.Enqueue(x));
+  XCTAssertEqual(rb.Enqueue(x), std::nullopt);
   res = rb.Dequeue();
   XCTAssertTrue(res.has_value());
-  XCTAssertEqual(res.value(), 2);
+  XCTAssertEqual(res.value(), x);
 
   // The ring should be empty again
   XCTAssertTrue(rb.Empty());
 
   // Fill up the ring
-  XCTAssertFalse(rb.Enqueue(3));
-  XCTAssertFalse(rb.Enqueue(4));
-  XCTAssertFalse(rb.Enqueue(5));
+  XCTAssertEqual(rb.Enqueue(3), std::nullopt);
+  XCTAssertEqual(rb.Enqueue(4), std::nullopt);
+  XCTAssertEqual(rb.Enqueue(5), std::nullopt);
 
   XCTAssertTrue(rb.Full());
 
   // Add another item to overwrite the oldest item in the queue
-  XCTAssertTrue(rb.Enqueue(6));
+  res = rb.Enqueue(6);
+  XCTAssertTrue(res.has_value());
+  XCTAssertEqual(res.value(), 3);
   XCTAssertTrue(rb.Full());
 
   // Drain the queue and ensure proper values
@@ -89,28 +91,31 @@ using santa::RingBuffer;
   XCTAssertFalse(rb.Full());
 
   // Add an object and check ring state
-  XCTAssertFalse(rb.Enqueue(@"foo"));
+  XCTAssertEqual(rb.Enqueue(@"foo"), std::nullopt);
   XCTAssertFalse(rb.Full());
   XCTAssertFalse(rb.Empty());
 
   // Remove the object, confirm the value, and check ring state
   XCTAssertEqualObjects(rb.Dequeue().value(), @"foo");
 
+  XCTAssertEqual(rb.Enqueue(@"throwaway"), std::nullopt);
+
   // Add an object within a new scope to ensure the ring properly holds onto the object
   @autoreleasepool {
     NSString *pidStr = [NSString stringWithFormat:@"pid: %d", getpid()];
-    XCTAssertFalse(rb.Enqueue([pidStr copy]));
+    XCTAssertEqual(rb.Enqueue([pidStr copy]), std::nullopt);
     pidStr = nil;
   }
-
-  NSString *str = @"bar";
-  XCTAssertFalse(rb.Enqueue(str));
 
   XCTAssertTrue(rb.Full());
   XCTAssertFalse(rb.Empty());
 
+  NSString *str = @"bar";
+  NSString *res = rb.Enqueue(str).value_or(nil);
+  XCTAssertEqualObjects(res, @"throwaway");
+
   // Drain the ring and check values
-  NSString *res = rb.Dequeue().value_or(@"BAD");
+  res = rb.Dequeue().value_or(@"BAD");
   XCTAssertEqualObjects(res, ([NSString stringWithFormat:@"pid: %d", getpid()]));
 
   res = rb.Dequeue().value_or(@"BAD");

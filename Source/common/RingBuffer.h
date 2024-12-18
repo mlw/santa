@@ -36,24 +36,24 @@ class RingBuffer {
   RingBuffer(const RingBuffer& other) = delete;
   RingBuffer& operator=(const RingBuffer& other) = delete;
 
-  bool Enqueue(const T& val) {
-    bool dropped = false;
+  std::optional<T> Enqueue(const T& val) {
+    std::optional<T> removed_value;
     if (Full()) {
+      removed_value = std::move(buffer_.front());
       buffer_.erase(buffer_.begin());
-      dropped = true;
     }
     buffer_.push_back(val);
-    return dropped;
+    return removed_value;
   }
 
-  bool Enqueue(T&& val) {
-    bool dropped = false;
+  std::optional<T> Enqueue(T&& val) {
+    std::optional<T> removed_value;
     if (Full()) {
+      removed_value = std::move(buffer_.front());
       buffer_.erase(buffer_.begin());
-      dropped = true;
     }
     buffer_.push_back(std::move(val));
-    return dropped;
+    return removed_value;
   }
 
   std::optional<T> Dequeue() {
