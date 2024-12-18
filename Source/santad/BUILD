@@ -169,7 +169,7 @@ objc_library(
 
 objc_library(
     name = "SNTNotificationQueue",
-    srcs = ["SNTNotificationQueue.m"],
+    srcs = ["SNTNotificationQueue.mm"],
     hdrs = ["SNTNotificationQueue.h"],
     deps = [
         "//Source/common:SNTLogging",
