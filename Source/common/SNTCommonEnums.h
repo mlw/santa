@@ -27,11 +27,14 @@ typedef NS_ENUM(NSInteger, SNTAction) {
   // If an operation is awaiting a cache decision from a similar operation
   // currently being processed, it will poll about every 5 ms for an answer.
   SNTActionRequestBinary,
+  SNTActionRequestAllow,
+  SNTActionRequestDeny,
 
   // RESPONSES
   SNTActionRespondAllow,
   SNTActionRespondDeny,
   SNTActionRespondAllowCompiler,
+  SNTActionRespondHold,
 };
 
 #define RESPONSE_VALID(x) \

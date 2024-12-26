@@ -147,29 +147,41 @@ using santa::Message;
 
 - (bool)postAction:(SNTAction)action forMessage:(const Message &)esMsg {
   es_auth_result_t authResult;
+  SNTAction cacheableAction = action;
 
   switch (action) {
     case SNTActionRespondAllowCompiler:
       [self.compilerController setProcess:esMsg->event.exec.target->audit_token isCompiler:true];
       OS_FALLTHROUGH;
+    case SNTActionRespondHold: OS_FALLTHROUGH;
     case SNTActionRespondAllow: authResult = ES_AUTH_RESULT_ALLOW; break;
     case SNTActionRespondDeny: authResult = ES_AUTH_RESULT_DENY; break;
+    // These actions will not generate a respnse.
+    case SNTActionRequestAllow: cacheableAction = SNTActionRespondAllow; break;
+    case SNTActionRequestDeny: cacheableAction = SNTActionRespondDeny; break;
     default:
       // This is a programming error. Bail.
       LOGE(@"Invalid action for postAction, exiting.");
       [NSException raise:@"Invalid post action" format:@"Invalid post action: %ld", action];
   }
 
-  self->_authResultCache->AddToCache(esMsg->event.exec.target->executable, action);
+  if (action != SNTActionRespondHold) {
+    self->_authResultCache->AddToCache(esMsg->event.exec.target->executable, cacheableAction);
+  }
 
-  // Don't let the ES framework cache DENY results. Santa only flushes ES cache
-  // when a new DENY rule is received. If DENY results were cached and a rule
-  // update made the executable allowable, ES would continue to apply the DENY
-  // cached result. Note however that the local AuthResultCache will cache
-  // DENY results.
-  return [self respondToMessage:esMsg
-                 withAuthResult:authResult
-                      cacheable:(authResult == ES_AUTH_RESULT_ALLOW)];
+  if (action != SNTActionRequestAllow && action != SNTActionRequestDeny) {
+    // Don't let the ES framework cache DENY results. Santa only flushes ES cache
+    // when a new DENY rule is received. If DENY results were cached and a rule
+    // update made the executable allowable, ES would continue to apply the DENY
+    // cached result. Note however that the local AuthResultCache will cache
+    // DENY results.
+    return [self respondToMessage:esMsg
+                   withAuthResult:authResult
+                        cacheable:((authResult == ES_AUTH_RESULT_ALLOW) &&
+                                   (action != SNTActionRespondHold))];
+  } else {
+    return true;
+  }
 }
 
 - (void)enable {

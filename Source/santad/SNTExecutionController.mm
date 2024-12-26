@@ -332,7 +332,7 @@ static NSString *const kPrinterProxyPostMonterey =
     // binary outside of the auth flow will be blocked.
     _procSignalCache->set(pidAndVersion, true);
     stoppedProc = [self manipulatePID:newProcPid withControl:ProcessControl::Suspend];
-    postAction(SNTActionRespondAllow);
+    postAction(SNTActionRespondHold);
     holdAndAsk = true;
   } else {
     // Respond with the decision.
@@ -477,6 +477,8 @@ static NSString *const kPrinterProxyPostMonterey =
               [self manipulatePID:newProcPid withControl:ProcessControl::Kill];
               _procSignalCache->remove(pidAndVersion);
             }
+
+            postAction(authenticated ? SNTActionRequestAllow : SNTActionRequestDeny);
           };
         }
 
