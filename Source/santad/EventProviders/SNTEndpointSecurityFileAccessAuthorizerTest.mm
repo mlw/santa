@@ -363,6 +363,7 @@ void SetExpectationsForFileAccessAuthorizerInit(
 }
 
 - (void)testApplyPolicyToMessage {
+  LOGE(@"testApplyPolicyToMessage: 0");
   const char *instigatingPath = "/path/to/proc";
   const char *instigatingTeamID = "my_teamid";
   WatchItemProcess policyProc(instigatingPath, "", "", {}, "", std::nullopt);
@@ -373,12 +374,12 @@ void SetExpectationsForFileAccessAuthorizerInit(
   esProc.team_id = MakeESStringToken(instigatingTeamID);
   memcpy(esProc.cdhash, instigatingCDHash.data(), sizeof(esProc.cdhash));
   es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_OPEN, &esProc);
-
+  LOGE(@"testApplyPolicyToMessage: 0.1");
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
   mockESApi->SetExpectationsESNewClient();
   mockESApi->SetExpectationsRetainReleaseMessage();
   SetExpectationsForFileAccessAuthorizerInit(mockESApi);
-
+  LOGE(@"testApplyPolicyToMessage: 0.2");
   auto mockFAA = std::make_shared<MockFAAPolicyProcessor>(self.dcMock);
 
   SNTEndpointSecurityFileAccessAuthorizer *accessClient =
@@ -392,29 +393,39 @@ void SetExpectationsForFileAccessAuthorizerInit(
 
   id accessClientMock = OCMPartialMock(accessClient);
 
+  LOGE(@"testApplyPolicyToMessage: 1");
+
   PathTarget target = {.path = "/some/random/path", .isReadable = true};
+  LOGE(@"testApplyPolicyToMessage: 1.1");
   int fake;
+  LOGE(@"testApplyPolicyToMessage: 1.2");
   OCMStub([accessClientMock specialCaseForPolicy:nullptr target:target message:*(Message *)&fake])
       .ignoringNonObjectArgs()
       .andReturn(FileAccessPolicyDecision::kNoPolicy);
 
   // If no policy exists, the operation is allowed
   {
+    LOGE(@"testApplyPolicyToMessage: 2");
     XCTAssertEqual([accessClient applyPolicy:std::nullopt
                                    forTarget:target
                                    toMessage:Message(mockESApi, &esMsg)],
                    FileAccessPolicyDecision::kNoPolicy);
   }
 
+  LOGE(@"testApplyPolicyToMessage: 2.1");
   auto policy = std::make_shared<DataWatchItemPolicy>("foo_policy", "ver", "/foo");
+  LOGE(@"testApplyPolicyToMessage: 2.2");
   policy->processes.insert(policyProc);
+  LOGE(@"testApplyPolicyToMessage: 2.3");
   auto optionalPolicy = std::make_optional<std::shared_ptr<DataWatchItemPolicy>>(policy);
 
   // Signed but invalid instigating processes are automatically
   // denied when `EnableBadSignatureProtection` is true
   {
+    LOGE(@"testApplyPolicyToMessage: 3");
     OCMExpect([self.mockConfigurator enableBadSignatureProtection]).andReturn(YES);
     esMsg.process->codesigning_flags = CS_SIGNED;
+    LOGE(@"testApplyPolicyToMessage: 4");
     XCTAssertEqual([accessClient applyPolicy:optionalPolicy
                                    forTarget:target
                                    toMessage:Message(mockESApi, &esMsg)],
@@ -425,8 +436,10 @@ void SetExpectationsForFileAccessAuthorizerInit(
   // denied when `EnableBadSignatureProtection` is false. Policy
   // evaluation should continue normally.
   {
+    LOGE(@"testApplyPolicyToMessage: 5");
     OCMExpect([self.mockConfigurator enableBadSignatureProtection]).andReturn(NO);
     esMsg.process->codesigning_flags = CS_SIGNED;
+    LOGE(@"testApplyPolicyToMessage: 6");
     EXPECT_CALL(*mockFAA, PolicyMatchesProcess).WillOnce(testing::Return(true));
     XCTAssertEqual([accessClient applyPolicy:optionalPolicy
                                    forTarget:target
@@ -439,8 +452,10 @@ void SetExpectationsForFileAccessAuthorizerInit(
 
   // If no exceptions, operations are logged and denied
   {
+    LOGE(@"testApplyPolicyToMessage: 7");
     EXPECT_CALL(*mockFAA, PolicyMatchesProcess).WillOnce(testing::Return(false));
     policy->audit_only = false;
+    LOGE(@"testApplyPolicyToMessage: 8");
     XCTAssertEqual([accessClient applyPolicy:optionalPolicy
                                    forTarget:target
                                    toMessage:Message(mockESApi, &esMsg)],
@@ -449,8 +464,10 @@ void SetExpectationsForFileAccessAuthorizerInit(
 
   // For audit only policies with no exceptions, operations are logged but allowed
   {
+    LOGE(@"testApplyPolicyToMessage: 9");
     EXPECT_CALL(*mockFAA, PolicyMatchesProcess).WillOnce(testing::Return(false));
     policy->audit_only = true;
+    LOGE(@"testApplyPolicyToMessage: 10");
     XCTAssertEqual([accessClient applyPolicy:optionalPolicy
                                    forTarget:target
                                    toMessage:Message(mockESApi, &esMsg)],
@@ -464,8 +481,10 @@ void SetExpectationsForFileAccessAuthorizerInit(
   // If the policy wasn't matched, but the rule type specifies denied processes,
   // then the operation should be allowed.
   {
+    LOGE(@"testApplyPolicyToMessage: 11");
     EXPECT_CALL(*mockFAA, PolicyMatchesProcess).WillOnce(testing::Return(false));
     policy->audit_only = false;
+    LOGE(@"testApplyPolicyToMessage: 12");
     XCTAssertEqual([accessClient applyPolicy:optionalPolicy
                                    forTarget:target
                                    toMessage:Message(mockESApi, &esMsg)],
@@ -475,8 +494,10 @@ void SetExpectationsForFileAccessAuthorizerInit(
   // For audit only policies with no process match and the rule type specifies
   // denied processes, operations are allowed.
   {
+    LOGE(@"testApplyPolicyToMessage: 13");
     EXPECT_CALL(*mockFAA, PolicyMatchesProcess).WillOnce(testing::Return(false));
     policy->audit_only = true;
+    LOGE(@"testApplyPolicyToMessage: 14");
     XCTAssertEqual([accessClient applyPolicy:optionalPolicy
                                    forTarget:target
                                    toMessage:Message(mockESApi, &esMsg)],
@@ -486,8 +507,10 @@ void SetExpectationsForFileAccessAuthorizerInit(
   // For audit only policies with matched process details and the rule type specifies
   // denied processes, operations are allowed audit only.
   {
+    LOGE(@"testApplyPolicyToMessage: 15");
     EXPECT_CALL(*mockFAA, PolicyMatchesProcess).WillOnce(testing::Return(true));
     policy->audit_only = true;
+    LOGE(@"testApplyPolicyToMessage: 16");
     XCTAssertEqual([accessClient applyPolicy:optionalPolicy
                                    forTarget:target
                                    toMessage:Message(mockESApi, &esMsg)],
@@ -497,8 +520,10 @@ void SetExpectationsForFileAccessAuthorizerInit(
   // For policies with matched process details and the rule type specifies
   // denied processes, operations are denied.
   {
+    LOGE(@"testApplyPolicyToMessage: 17");
     EXPECT_CALL(*mockFAA, PolicyMatchesProcess).WillOnce(testing::Return(true));
     policy->audit_only = false;
+    LOGE(@"testApplyPolicyToMessage: 18");
     XCTAssertEqual([accessClient applyPolicy:optionalPolicy
                                    forTarget:target
                                    toMessage:Message(mockESApi, &esMsg)],
