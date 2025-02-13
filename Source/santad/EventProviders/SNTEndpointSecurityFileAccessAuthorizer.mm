@@ -409,6 +409,7 @@ bool ShouldMessageTTY(const std::shared_ptr<DataWatchItemPolicy> &policy, const 
     _watchItems = std::move(watchItems);
     _logger = std::move(logger);
     _enricher = std::move(enricher);
+    LOGE(@"Data FAA Client Init: faapp: %p", faaPolicyProcessor.get());
     _faaPolicyProcessor = faaPolicyProcessor;
     _ttyWriter = std::move(ttyWriter);
     _metrics = std::move(metrics);
@@ -540,7 +541,10 @@ bool ShouldMessageTTY(const std::shared_ptr<DataWatchItemPolicy> &policy, const 
   LOGE(@"applyPolicy: 7");
   for (const WatchItemProcess &process : policy->processes) {
     LOGE(@"applyPolicy: 7.1...");
-    LOGE(@"applyPolicy: 7.1: faapp: %p, msg->proc: %p", self.faaPolicyProcessor.get(), msg->process);
+    LOGE(@"applyPolicy: 7.1... self: %p", self);
+    LOGE(@"applyPolicy: 7.1... self->_faaPolicyProcessor: %p", self->_faaPolicyProcessor.get());
+    LOGE(@"applyPolicy: 7.1... _faaPolicyProcessor: %p", _faaPolicyProcessor.get());
+    LOGE(@"applyPolicy: 7.1: msg->proc: %p", msg->process);
     if (self.faaPolicyProcessor->PolicyMatchesProcess(process, msg->process)) {
       LOGE(@"applyPolicy: 7.2");
       decision = FileAccessPolicyDecision::kAllowed;
