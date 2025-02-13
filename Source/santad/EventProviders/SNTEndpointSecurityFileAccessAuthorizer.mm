@@ -496,11 +496,13 @@ bool ShouldMessageTTY(const std::shared_ptr<DataWatchItemPolicy> &policy, const 
                                 (std::optional<std::shared_ptr<DataWatchItemPolicy>>)optionalPolicy
                               forTarget:(const PathTarget &)target
                               toMessage:(const Message &)msg {
+  LOGE(@"applyPolicy: 1");
   // If no policy exists, everything is allowed
   if (!optionalPolicy.has_value()) {
     return FileAccessPolicyDecision::kNoPolicy;
   }
 
+  LOGE(@"applyPolicy: 2");
   // If the process is signed but has an invalid signature, it is denied
   if (((msg->process->codesigning_flags & (CS_SIGNED | CS_VALID)) == CS_SIGNED) &&
       [self.configurator enableBadSignatureProtection]) {
@@ -510,32 +512,41 @@ bool ShouldMessageTTY(const std::shared_ptr<DataWatchItemPolicy> &policy, const 
     return FileAccessPolicyDecision::kDeniedInvalidSignature;
   }
 
+  LOGE(@"applyPolicy: 3");
   std::shared_ptr<DataWatchItemPolicy> policy = optionalPolicy.value();
 
+  LOGE(@"applyPolicy: 4");
   // If policy allows reading, add target to the cache
   if (policy->allow_read_access && target.devnoIno.has_value()) {
+    LOGE(@"applyPolicy: 4.1");
     self->_readsCache.Set(msg->process, ^{
       return *target.devnoIno;
     });
   }
 
+  LOGE(@"applyPolicy: 5");
   // Check if this action contains any special case that would produce
   // an immediate result.
   FileAccessPolicyDecision specialCase = [self specialCaseForPolicy:policy
                                                              target:target
                                                             message:msg];
+  LOGE(@"applyPolicy: 6");
   if (specialCase != FileAccessPolicyDecision::kNoPolicy) {
     return specialCase;
   }
 
   FileAccessPolicyDecision decision = FileAccessPolicyDecision::kDenied;
 
+  LOGE(@"applyPolicy: 7");
   for (const WatchItemProcess &process : policy->processes) {
+    LOGE(@"applyPolicy: 7.1");
     if (self.faaPolicyProcessor->PolicyMatchesProcess(process, msg->process)) {
+      LOGE(@"applyPolicy: 7.2");
       decision = FileAccessPolicyDecision::kAllowed;
       break;
     }
   }
+  LOGE(@"applyPolicy: 8");
 
   // If the RuleType option was configured to contain a list of denied processes,
   // the decision should be inverted from allowed to denied or vice versa.
@@ -549,9 +560,13 @@ bool ShouldMessageTTY(const std::shared_ptr<DataWatchItemPolicy> &policy, const 
     }
   }
 
+  LOGE(@"applyPolicy: 9");
+
   if (decision == FileAccessPolicyDecision::kDenied && policy->audit_only) {
     decision = FileAccessPolicyDecision::kAllowedAuditOnly;
   }
+
+  LOGE(@"applyPolicy: 10");
 
   return decision;
 }
