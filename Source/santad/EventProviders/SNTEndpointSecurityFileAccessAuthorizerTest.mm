@@ -90,7 +90,6 @@ void SetExpectationsForFileAccessAuthorizerInit(
 - (void)disable;
 
 @property bool isSubscribed;
-@property std::shared_ptr<santa::FAAPolicyProcessor> faaPolicyProcessor;
 @end
 
 @interface SNTEndpointSecurityFileAccessAuthorizerTest : XCTestCase
@@ -403,8 +402,6 @@ void SetExpectationsForFileAccessAuthorizerInit(
   OCMStub([accessClientMock specialCaseForPolicy:nullptr target:target message:*(Message *)&fake])
       .ignoringNonObjectArgs()
       .andReturn(FileAccessPolicyDecision::kNoPolicy);
-
-  OCMStub([accessClientMock faaPolicyProcessor]).andReturn(mockFAA);
 
   // If no policy exists, the operation is allowed
   {
