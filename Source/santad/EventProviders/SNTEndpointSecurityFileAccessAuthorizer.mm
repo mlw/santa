@@ -393,6 +393,7 @@ bool ShouldMessageTTY(const std::shared_ptr<DataWatchItemPolicy> &policy, const 
   ProcessSet<std::pair<dev_t, ino_t>> _readsCache;
   ProcessSet<std::pair<std::string, std::string>> _ttyMessageCache;
   std::shared_ptr<Metrics> _metrics;
+  // std::shared_ptr<santa::FAAPolicyProcessor> _faaPolicyProcessor;
 }
 
 - (instancetype)initWithESAPI:(std::shared_ptr<santa::EndpointSecurityAPI>)esApi
