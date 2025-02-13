@@ -539,7 +539,8 @@ bool ShouldMessageTTY(const std::shared_ptr<DataWatchItemPolicy> &policy, const 
 
   LOGE(@"applyPolicy: 7");
   for (const WatchItemProcess &process : policy->processes) {
-    LOGE(@"applyPolicy: 7.1");
+    LOGE(@"applyPolicy: 7.1...");
+    LOGE(@"applyPolicy: 7.1: faapp: %p, msg->proc: %p", self.faaPolicyProcessor.get(), msg->process);
     if (self.faaPolicyProcessor->PolicyMatchesProcess(process, msg->process)) {
       LOGE(@"applyPolicy: 7.2");
       decision = FileAccessPolicyDecision::kAllowed;
