@@ -393,7 +393,7 @@ bool ShouldMessageTTY(const std::shared_ptr<DataWatchItemPolicy> &policy, const 
   ProcessSet<std::pair<dev_t, ino_t>> _readsCache;
   ProcessSet<std::pair<std::string, std::string>> _ttyMessageCache;
   std::shared_ptr<Metrics> _metrics;
-  std::shared_ptr<santa::FAAPolicyProcessor> _faaPolicyProcessor;
+  // std::shared_ptr<santa::FAAPolicyProcessor> _faaPolicyProcessor;
 }
 
 - (instancetype)initWithESAPI:(std::shared_ptr<santa::EndpointSecurityAPI>)esApi
@@ -411,7 +411,7 @@ bool ShouldMessageTTY(const std::shared_ptr<DataWatchItemPolicy> &policy, const 
     _logger = std::move(logger);
     _enricher = std::move(enricher);
     LOGE(@"Data FAA Client Init: faapp: %p", faaPolicyProcessor.get());
-    _faaPolicyProcessor = std::move(faaPolicyProcessor);
+    _faaPolicyProcessor = faaPolicyProcessor;
     _ttyWriter = std::move(ttyWriter);
     _metrics = std::move(metrics);
 
@@ -546,12 +546,12 @@ bool ShouldMessageTTY(const std::shared_ptr<DataWatchItemPolicy> &policy, const 
     LOGE(@"applyPolicy: 7.1... self->_faaPolicyProcessor: %p", self->_faaPolicyProcessor.get());
     LOGE(@"applyPolicy: 7.1... _faaPolicyProcessor: %p", _faaPolicyProcessor.get());
     LOGE(@"applyPolicy: 7.1: new msg->proc: %p", msg->process);
-    // LOGE(@"applyPolicy: 7.1...: call thing self.faaPolicyProcessor");
-    // (void)self.faaPolicyProcessor;
-    // LOGE(@"applyPolicy: 7.1...: done call thing self.faaPolicyProcessor");
-    // LOGE(@"applyPolicy: 7.1...: self.faaPolicyProcessor.get(): %p", self.faaPolicyProcessor.get());
+    LOGE(@"applyPolicy: 7.1...: call thing self.faaPolicyProcessor");
+    (void)self.faaPolicyProcessor;
+    LOGE(@"applyPolicy: 7.1...: done call thing self.faaPolicyProcessor");
+    LOGE(@"applyPolicy: 7.1...: self.faaPolicyProcessor.get(): %p", self.faaPolicyProcessor.get());
     LOGE(@"applyPolicy: 7.1... continue");
-    if (_faaPolicyProcessor->PolicyMatchesProcess(process, msg->process)) {
+    if (self.faaPolicyProcessor->PolicyMatchesProcess(process, msg->process)) {
       LOGE(@"applyPolicy: 7.2");
       decision = FileAccessPolicyDecision::kAllowed;
       break;
@@ -621,7 +621,7 @@ bool ShouldMessageTTY(const std::shared_ptr<DataWatchItemPolicy> &policy, const 
     if (ShouldNotifyUserDecision(policyDecision) &&
         (!policy->silent || (!policy->silent_tty && TTYWriter::CanWrite(msg->process)))) {
       SNTCachedDecision *cd =
-          _faaPolicyProcessor->GetCachedDecision(msg->process->executable->stat);
+          self.faaPolicyProcessor->GetCachedDecision(msg->process->executable->stat);
 
       SNTFileAccessEvent *event = [[SNTFileAccessEvent alloc] init];
 

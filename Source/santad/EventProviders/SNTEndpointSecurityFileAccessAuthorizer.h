@@ -44,5 +44,5 @@ typedef void (^SNTFileAccessBlockCallback)(SNTFileAccessEvent *event, NSString *
                     ttyWriter:(std::shared_ptr<santa::TTYWriter>)ttyWriter;
 
 @property SNTFileAccessBlockCallback fileAccessBlockCallback;
-
+@property std::shared_ptr<santa::FAAPolicyProcessor> faaPolicyProcessor;
 @end
