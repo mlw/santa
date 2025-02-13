@@ -540,7 +540,7 @@ bool ShouldMessageTTY(const std::shared_ptr<DataWatchItemPolicy> &policy, const 
 
   LOGE(@"applyPolicy: 7");
   for (const WatchItemProcess &process : policy->processes) {
-    LOGE(@"applyPolicy: 7.1...");
+    LOGE(@"applyPolicy: 7.1... hi");
     LOGE(@"applyPolicy: 7.1... self: %p", self);
     LOGE(@"applyPolicy: 7.1... self->_faaPolicyProcessor: %p", self->_faaPolicyProcessor.get());
     LOGE(@"applyPolicy: 7.1... _faaPolicyProcessor: %p", _faaPolicyProcessor.get());
