@@ -465,7 +465,8 @@ using santa::WatchItemPathType;
                                              processor:Processor::kUnknown];
 
   {
-    XCTAssertThrows([client processMessage:Message(mockESApi, &esMsg)
+    Message msg(mockESApi, &esMsg);
+    XCTAssertThrows([client processMessage:std::move(msg)
                                    handler:^(Message msg){
                                    }]);
   }
