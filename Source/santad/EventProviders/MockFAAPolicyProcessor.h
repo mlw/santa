@@ -31,15 +31,14 @@
 
 namespace santa {
 
-template <typename BaseT>
-class MockFAAPolicyProcessor : public BaseT {
+class MockFAAPolicyProcessor : public FAAPolicyProcessor {
  public:
   MockFAAPolicyProcessor(
       SNTDecisionCache *dc, std::shared_ptr<Enricher> enricher, std::shared_ptr<Logger> logger,
       std::shared_ptr<TTYWriter> tty_writer,
       FAAPolicyProcessor::GenerateEventDetailLinkBlock generate_event_detail_link_block)
-      : BaseT(dc, std::move(enricher), std::move(logger), std::move(tty_writer),
-              std::move(generate_event_detail_link_block)) {}
+      : FAAPolicyProcessor(dc, std::move(enricher), std::move(logger), std::move(tty_writer),
+                           std::move(generate_event_detail_link_block)) {}
   virtual ~MockFAAPolicyProcessor() {}
 
   MOCK_METHOD(bool, PolicyMatchesProcess,

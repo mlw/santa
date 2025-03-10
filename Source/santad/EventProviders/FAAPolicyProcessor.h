@@ -52,9 +52,6 @@ extern NSString *const kBadCertHash;
 namespace santa {
 
 // Forward declaration
-class DataFAAPolicyProcessor;
-class ProcessFAAPolicyProcessor;
-template <typename T>
 class MockFAAPolicyProcessor;
 
 enum class FAAClientType {
@@ -97,9 +94,12 @@ class FAAPolicyProcessor {
   template <typename ValueT>
   using ProcessSetCache = santa::SantaSetCache<ReadsCacheKey, ValueT>;
 
+  // Friend classes that can call private methods requiring FAAClientType parameters
+  friend class DataFAAPolicyProcessorProxy;
+  friend class ProcessFAAPolicyProcessorProxy;
+
   // Friend class used for tests
-  friend class MockFAAPolicyProcessor<ProcessFAAPolicyProcessor>;
-  friend class MockFAAPolicyProcessor<DataFAAPolicyProcessor>;
+  friend class MockFAAPolicyProcessor;
 
   FAAPolicyProcessor(SNTDecisionCache *decision_cache, std::shared_ptr<Enricher> enricher,
                      std::shared_ptr<Logger> logger, std::shared_ptr<TTYWriter> tty_writer,
@@ -111,6 +111,21 @@ class FAAPolicyProcessor {
                                     const es_process_t *es_proc);
 
   virtual SNTCachedDecision *__strong GetCachedDecision(const struct stat &stat_buf);
+
+  static std::vector<FAAPolicyProcessor::PathTarget> PathTargets(const Message &msg);
+
+ private:
+  SNTDecisionCache *decision_cache_;
+  std::shared_ptr<Enricher> enricher_;
+  std::shared_ptr<Logger> logger_;
+  std::shared_ptr<TTYWriter> tty_writer_;
+  GenerateEventDetailLinkBlock generate_event_detail_link_block_;
+  ProcessSetCache<std::pair<dev_t, ino_t>> reads_cache_;
+  SantaCache<SantaVnode, NSString *> cert_hash_cache_;
+  SNTConfigurator *configurator_;
+  dispatch_queue_t queue_;
+
+  virtual NSString *__strong GetCertificateHash(const es_file_t *es_file);
 
   /// General flow of processing an ES message for FAA violations:
   /// 1. Client presents a vector of pairs of target paths being accessed and associated policies
@@ -143,21 +158,6 @@ class FAAPolicyProcessor {
   /// Used by callers to inform when a process has exited and will no longer process events.
   void NotifyExit(const Message &msg, FAAClientType client_type);
 
-  static std::vector<FAAPolicyProcessor::PathTarget> PathTargets(const Message &msg);
-
- private:
-  SNTDecisionCache *decision_cache_;
-  std::shared_ptr<Enricher> enricher_;
-  std::shared_ptr<Logger> logger_;
-  std::shared_ptr<TTYWriter> tty_writer_;
-  GenerateEventDetailLinkBlock generate_event_detail_link_block_;
-  ProcessSetCache<std::pair<dev_t, ino_t>> reads_cache_;
-  SantaCache<SantaVnode, NSString *> cert_hash_cache_;
-  SNTConfigurator *configurator_;
-  dispatch_queue_t queue_;
-
-  virtual NSString *__strong GetCertificateHash(const es_file_t *es_file);
-
   FileAccessPolicyDecision ProcessTargetAndPolicy(
       const Message &msg, const PathTarget &target,
       const std::optional<std::shared_ptr<WatchItemPolicyBase>> optional_policy,
@@ -179,52 +179,66 @@ class FAAPolicyProcessor {
               const WatchItemPolicyBase &policy);
 };
 
-class ProcessFAAPolicyProcessor : public FAAPolicyProcessor {
+class FAAPolicyProcessorProxy {
  public:
-  using FAAPolicyProcessor::FAAPolicyProcessor;
+  FAAPolicyProcessorProxy(std::shared_ptr<FAAPolicyProcessor> policy_processor)
+      : policy_processor_(std::move(policy_processor)) {}
+
+  FAAPolicyProcessor *operator->() { return policy_processor_.get(); }
+  FAAPolicyProcessor &operator*() { return *policy_processor_; }
+
+ protected:
+  std::shared_ptr<FAAPolicyProcessor> policy_processor_;
+};
+
+class ProcessFAAPolicyProcessorProxy : public FAAPolicyProcessorProxy {
+ public:
+  ProcessFAAPolicyProcessorProxy(std::shared_ptr<FAAPolicyProcessor> policy_processor)
+      : FAAPolicyProcessorProxy(std::move(policy_processor)) {}
   FAAPolicyProcessor::ESResult ProcessMessage(
-      const Message &msg, std::vector<TargetPolicyPair> target_policy_pairs,
-      ReadsCacheUpdateBlock reads_cache_update_block,
-      CheckIfPolicyMatchesBlock check_if_policy_matches_block,
+      const Message &msg, std::vector<FAAPolicyProcessor::TargetPolicyPair> target_policy_pairs,
+      FAAPolicyProcessor::ReadsCacheUpdateBlock reads_cache_update_block,
+      FAAPolicyProcessor::CheckIfPolicyMatchesBlock check_if_policy_matches_block,
       SNTFileAccessDeniedBlock file_access_denied_block,
       SNTOverrideFileAccessAction overrideAction) {
-    return FAAPolicyProcessor::ProcessMessage(
+    return policy_processor_->ProcessMessage(
         msg, std::move(target_policy_pairs), reads_cache_update_block,
         check_if_policy_matches_block, file_access_denied_block, overrideAction,
         FAAClientType::kProcess);
   }
 
   std::optional<FAAPolicyProcessor::ESResult> ImmediateResponse(const Message &msg) {
-    return FAAPolicyProcessor::ImmediateResponse(msg, FAAClientType::kProcess);
+    return policy_processor_->ImmediateResponse(msg, FAAClientType::kProcess);
   }
 
   void NotifyExit(const Message &msg) {
-    return FAAPolicyProcessor::NotifyExit(msg, FAAClientType::kProcess);
+    return policy_processor_->NotifyExit(msg, FAAClientType::kProcess);
   }
 };
 
-class DataFAAPolicyProcessor : public FAAPolicyProcessor {
+class DataFAAPolicyProcessorProxy : public FAAPolicyProcessorProxy {
  public:
-  using FAAPolicyProcessor::FAAPolicyProcessor;
+  DataFAAPolicyProcessorProxy(std::shared_ptr<FAAPolicyProcessor> policy_processor)
+      : FAAPolicyProcessorProxy(std::move(policy_processor)) {}
 
   FAAPolicyProcessor::ESResult ProcessMessage(
-      const Message &msg, std::vector<TargetPolicyPair> target_policy_pairs,
-      ReadsCacheUpdateBlock reads_cache_update_block,
-      CheckIfPolicyMatchesBlock check_if_policy_matches_block,
+      const Message &msg, std::vector<FAAPolicyProcessor::TargetPolicyPair> target_policy_pairs,
+      FAAPolicyProcessor::ReadsCacheUpdateBlock reads_cache_update_block,
+      FAAPolicyProcessor::CheckIfPolicyMatchesBlock check_if_policy_matches_block,
       SNTFileAccessDeniedBlock file_access_denied_block,
       SNTOverrideFileAccessAction overrideAction) {
-    return FAAPolicyProcessor::ProcessMessage(
+    return policy_processor_->ProcessMessage(
         msg, std::move(target_policy_pairs), reads_cache_update_block,
         check_if_policy_matches_block, file_access_denied_block, overrideAction,
         FAAClientType::kData);
   }
 
   std::optional<FAAPolicyProcessor::ESResult> ImmediateResponse(const Message &msg) {
-    return FAAPolicyProcessor::ImmediateResponse(msg, FAAClientType::kData);
+    return policy_processor_->ImmediateResponse(msg, FAAClientType::kData);
   }
 
   void NotifyExit(const Message &msg) {
-    return FAAPolicyProcessor::NotifyExit(msg, FAAClientType::kData);
+    return policy_processor_->NotifyExit(msg, FAAClientType::kData);
   }
 };
 
