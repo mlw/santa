@@ -192,6 +192,7 @@ bool FAAPolicyProcessor::PolicyMatchesProcess(const WatchItemProcess &policy_pro
   // outside of this method. This method is used to individually check each
   // configured process exception while the check for a valid code signature
   // is more broad and applies whether or not process exceptions exist.
+  NSLog(@"----- PolicYMatchesProcess ENTER");
   if (es_proc->codesigning_flags & CS_SIGNED) {
     // Check whether or not the process is a platform binary if specified by the policy.
     if (policy_proc.platform_binary.has_value() &&

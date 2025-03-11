@@ -182,9 +182,13 @@ using ProcessSetCache = santa::SantaSetCache<std::pair<pid_t, int>, ValueT>;
 
   __block santa::ProbeInterest interest = santa::ProbeInterest::kUninterested;
 
+  NSLog(@"===== About to iterate");
   self.iterateProcessPoliciesBlock(^bool(std::shared_ptr<ProcessWatchItemPolicy> policy) {
+    NSLog(@"===== About to get cache");
     ProcessRuleCache *cache = _procRuleCache.get();
+    NSLog(@"===== About to loop processes");
     for (const santa::WatchItemProcess &policyProcess : policy->processes) {
+      NSLog(@"===== About to call PolicyMatchesProcess");
       if ((*self.faaPolicyProcessorProxy)
               ->PolicyMatchesProcess(policyProcess, esMsg->event.exec.target)) {
         // Map the new process to the matched policy and begin

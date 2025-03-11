@@ -95,14 +95,18 @@ void SetExpectationsForProcessFileAccessAuthorizerInit(
   mockESApi->SetExpectationsRetainReleaseMessage();
   SetExpectationsForProcessFileAccessAuthorizerInit(mockESApi);
 
+  NSLog(@"~~~~~ About to create shared MockFAAPolicyProcessor");
   // First call will not match, second call will match
   auto mockFAA = std::make_shared<MockFAAPolicyProcessor>(nil, nullptr, nullptr, nullptr, nil);
+  NSLog(@"~~~~~ About to set MockFAAPolicyProcessor expectations");
   EXPECT_CALL(*mockFAA, PolicyMatchesProcess)
       .WillOnce(testing::Return(false))
       .WillOnce(testing::Return(true));
+  NSLog(@"~~~~~ About to create shared FAAPP Proxy");
   auto mockFAAProxy = std::make_shared<santa::ProcessFAAPolicyProcessorProxy>(mockFAA);
 
   // Test object to provide to the CheckPolicyBlock
+  NSLog(@"~~~~~ About to create watch item");
   WatchItemProcess proc{"proc_path_1", "com.example.proc", "PROCTEAMID", {}, "", std::nullopt};
   auto pwip = std::make_shared<ProcessWatchItemPolicy>(
       "name", "ver", SetPairPathAndType{PairPathAndType{"path1", WatchItemPathType::kLiteral}},
@@ -115,31 +119,38 @@ void SetExpectationsForProcessFileAccessAuthorizerInit(
     checkPolicyBlockResult = block(pwip);
   };
 
+  NSLog(@"~~~~~ About to create proc FAA client");
   SNTEndpointSecurityProcessFileAccessAuthorizer *procFAAClient =
       [[SNTEndpointSecurityProcessFileAccessAuthorizer alloc] initWithESAPI:mockESApi
                                                                     metrics:nullptr
                                                          faaPolicyProcessor:mockFAAProxy
                                                 iterateProcessPoliciesBlock:iterPoliciesBlock];
+  NSLog(@"~~~~~ About to create partial mock of proc FAA client");
   id mockProcFAAClient = OCMPartialMock(procFAAClient);
 
   // Fake being conected so the probe runs
   procFAAClient.isSubscribed = true;
 
   {
+    NSLog(@"~~~~~ About to create message");
     santa::Message msg(mockESApi, &esMsg);
 
     // First test a non-matching policy. The probe should return uninterested
     // and the CheckPolicyBlock should not return true;
+    NSLog(@"~~~~~ About to call probeInterest");
     XCTAssertEqual([procFAAClient probeInterest:msg], santa::ProbeInterest::kUninterested);
     XCTAssertFalse(checkPolicyBlockResult);
 
     // Next check a mtching policy. The probe should return interested, the
     // process should be muted, and CheckPolicyBlock should return true.
+    NSLog(@"~~~~~ About to mute a thing");
     OCMExpect([mockProcFAAClient muteProcess:&execProc.audit_token]).andReturn(true);
 
+    NSLog(@"~~~~~ About to probe interest again");
     XCTAssertEqual([procFAAClient probeInterest:msg], santa::ProbeInterest::kInterested);
     XCTAssertTrue(checkPolicyBlockResult);
 
+    NSLog(@"~~~~~ About to verify stuff");
     XCTAssertTrue(OCMVerifyAll(mockProcFAAClient));
   }
 }
