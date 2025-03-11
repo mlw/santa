@@ -151,6 +151,7 @@ void SetExpectationsForProcessFileAccessAuthorizerInit(
     XCTAssertTrue(checkPolicyBlockResult);
 
     NSLog(@"~~~~~ About to verify stuff");
+    XCTFail("Force fail");
     XCTAssertTrue(OCMVerifyAll(mockProcFAAClient));
   }
 }
