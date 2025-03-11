@@ -189,6 +189,9 @@ using ProcessSetCache = santa::SantaSetCache<std::pair<pid_t, int>, ValueT>;
     NSLog(@"===== About to loop processes");
     for (const santa::WatchItemProcess &policyProcess : policy->processes) {
       NSLog(@"===== About to call PolicyMatchesProcess");
+      NSLog(@"self: %p", self);
+      NSLog(@"self.faaPolicyProcessorProxy.get(): %p", self.faaPolicyProcessorProxy.get());
+      NSLog(@"self.faaPolicyProcessorProxy->operator->(): %p", self.faaPolicyProcessorProxy->operator->());
       if ((*(self.faaPolicyProcessorProxy))
               ->PolicyMatchesProcess(policyProcess, esMsg->event.exec.target)) {
         // Map the new process to the matched policy and begin
