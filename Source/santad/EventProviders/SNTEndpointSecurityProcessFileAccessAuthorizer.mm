@@ -189,11 +189,13 @@ using ProcessSetCache = santa::SantaSetCache<std::pair<pid_t, int>, ValueT>;
     NSLog(@"===== About to loop processes");
     for (const santa::WatchItemProcess &policyProcess : policy->processes) {
       NSLog(@"===== About to call PolicyMatchesProcess");
-      if ((*self.faaPolicyProcessorProxy)
+      if ((*(self.faaPolicyProcessorProxy))
               ->PolicyMatchesProcess(policyProcess, esMsg->event.exec.target)) {
         // Map the new process to the matched policy and begin
         // watching the new process
+        NSLog(@"===== About to set cache item");
         cache->set(PidPidversion(esMsg->event.exec.target->audit_token), policy);
+        NSLog(@"===== About to start watching process");
         [self muteProcess:&esMsg->event.exec.target->audit_token];
 
         interest = santa::ProbeInterest::kInterested;
