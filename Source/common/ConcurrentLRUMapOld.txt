@@ -1,0 +1,1319 @@
+/// Copyright 2025 North Pole Security, Inc.
+///
+/// Licensed under the Apache License, Version 2.0 (the "License");
+/// you may not use this file except in compliance with the License.
+/// You may obtain a copy of the License at
+///
+///     https://www.apache.org/licenses/LICENSE-2.0
+///
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
+
+#ifndef SANTA__COMMON__CONCURRENTLRUMAP_H
+#define SANTA__COMMON__CONCURRENTLRUMAP_H
+
+// #define XSTR(x) STR(x)
+// #define STR(x) #x
+// #pragma message "The value of X: " XSTR(__cplusplus)
+// #if __cplusplus == 2024
+// #error __cplusplus
+
+
+#ifndef LRU_MAP
+#define LRU_MAP
+#include <Foundation/Foundation.h>
+#include "absl/container/flat_hash_map.h"
+#include "absl/synchronization/mutex.h"
+#include <list>
+#include <optional>
+#include <vector>
+#include <memory>
+#include <functional>
+
+template<typename Key, typename Value>
+class ShardedLRUCache {
+private:
+    // Node structure for doubly-linked list
+    struct Node {
+        Node(const Key& k, const Value& v, size_t b)
+            : key(k), value(v), bucket_index(b) {}
+
+        Key key;
+        Value value;
+        size_t bucket_index;
+    };
+
+    // Bucket structure for sharding
+    struct Bucket {
+        absl::flat_hash_map<Key, typename std::list<Node>::iterator> cache_map;
+        mutable absl::Mutex mutex;
+    };
+
+    // Global LRU list and its mutex
+    std::list<Node> lru_list;
+    mutable absl::Mutex lru_mutex;
+
+    size_t total_capacity;
+    size_t num_buckets;
+    std::vector<std::unique_ptr<Bucket>> buckets;
+
+    // Hash function to determine bucket
+    size_t GetBucketIndex(const Key& key) const {
+        return std::hash<Key>{}(key) % num_buckets;
+    }
+
+    // Get reference to appropriate bucket
+    Bucket& GetBucket(const Key& key) {
+        return *buckets[GetBucketIndex(key)];
+    }
+
+    const Bucket& GetBucket(const Key& key) const {
+        return *buckets[GetBucketIndex(key)];
+    }
+
+    // Move node to front of LRU list (assumes lru_mutex is held)
+    void Touch(typename std::list<Node>::iterator it) {
+        lru_list.splice(lru_list.begin(), lru_list, it);
+    }
+
+    // Evict least recently used item (assumes lru_mutex is held)
+    void EvictLRU() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lru_mutex) {
+        if (lru_list.empty()) return;
+
+        const Node& lru_node = lru_list.back();
+        size_t bucket_idx = lru_node.bucket_index;
+        Key key_to_remove = lru_node.key;
+
+        // Release the LRU lock before acquiring bucket lock to prevent deadlock
+        lru_mutex.Unlock();
+
+        {
+            // Lock the specific bucket
+            absl::MutexLock bucket_lock(&buckets[bucket_idx]->mutex);
+            buckets[bucket_idx]->cache_map.erase(key_to_remove);
+        }
+
+        // Reacquire the LRU lock
+        lru_mutex.Lock();
+
+        // Check if the list was modified while we released the lock
+        if (!lru_list.empty() && lru_list.back().key == key_to_remove &&
+            lru_list.back().bucket_index == bucket_idx) {
+            lru_list.pop_back();
+        }
+        // If the back item changed, someone else already evicted, so we don't need to do anything
+    }
+
+public:
+    ShardedLRUCache(size_t size, size_t num_shards = 16)
+        : total_capacity(size)
+        , num_buckets(num_shards)
+    {
+        if (size == 0) throw std::invalid_argument("Cache size must be positive");
+        if (num_shards == 0) throw std::invalid_argument("Number of shards must be positive");
+        if (num_shards > size) throw std::invalid_argument("Number of shards cannot exceed cache size");
+
+        buckets.reserve(num_shards);
+        for (size_t i = 0; i < num_shards; ++i) {
+            buckets.push_back(std::make_unique<Bucket>());
+        }
+    }
+
+    void Put(const Key& key, const Value& value) {
+        size_t bucket_idx = GetBucketIndex(key);
+        Bucket& bucket = *buckets[bucket_idx];
+
+        // First, check if the key already exists in the bucket
+        {
+            absl::MutexLock bucket_lock(&bucket.mutex);
+            auto it = bucket.cache_map.find(key);
+            if (it != bucket.cache_map.end()) {
+                // Key exists, need to update value and move to front
+                absl::MutexLock lru_lock(&lru_mutex);
+                it->second->value = value;
+                Touch(it->second);
+                return;
+            }
+        }
+
+        // Key doesn't exist, need to add new entry and possibly evict
+        typename std::list<Node>::iterator list_it;
+        {
+        absl::MutexLock lru_lock(&lru_mutex);
+
+        // Check if we need to evict
+        if (lru_list.size() >= total_capacity) {
+          EvictLRU();
+        }
+
+        // Now add the new node at the front of the LRU list
+        lru_list.emplace_front(key, value, bucket_idx);
+        // auto list_it = lru_list.begin();
+        list_it = lru_list.begin();
+
+        // Release LRU lock before acquiring bucket lock to prevent deadlock
+        // lru_mutex.Unlock();
+        }
+
+        {
+          // Lock the bucket and add the mapping
+          absl::MutexLock bucket_lock(&bucket.mutex);
+          bucket.cache_map[key] = list_it;
+        }
+
+        // Note: We don't need to reacquire the LRU lock here since we're done
+    }
+
+    std::optional<Value> Get(const Key& key) {
+        Bucket& bucket = GetBucket(key);
+        typename std::list<Node>::iterator list_it;
+        Value result;
+        bool found = false;
+
+        // First check if the key exists in the bucket
+        {
+            absl::ReaderMutexLock bucket_lock(&bucket.mutex);
+            auto map_it = bucket.cache_map.find(key);
+            if (map_it != bucket.cache_map.end()) {
+                list_it = map_it->second;
+                result = list_it->value;
+                found = true;
+            }
+        }
+
+        if (found) {
+            // If found, update the LRU position
+            absl::MutexLock lru_lock(&lru_mutex);
+            Touch(list_it);
+            return result;
+        }
+
+        return std::nullopt;
+    }
+
+    // Check if a value exists without affecting LRU order
+    bool Contains(const Key& key) const {
+      const Bucket& bucket = GetBucket(key);
+
+      absl::ReaderMutexLock bucket_lock(&bucket.mutex);
+      auto it = bucket.cache_map.find(key);
+      return it != bucket.cache_map.end();
+    }
+
+    size_t Size() const {
+        absl::ReaderMutexLock lru_lock(&lru_mutex);
+        return lru_list.size();
+    }
+
+    void Clear() {
+        // Lock all buckets first, then the LRU list to prevent deadlock
+        std::vector<std::unique_ptr<absl::MutexLock>> bucket_locks;
+        bucket_locks.reserve(num_buckets);
+
+        for (auto& bucket : buckets) {
+            bucket_locks.push_back(std::make_unique<absl::MutexLock>(&bucket->mutex));
+            bucket->cache_map.clear();
+        }
+
+        absl::MutexLock lru_lock(&lru_mutex);
+        lru_list.clear();
+    }
+
+    size_t BucketCount() const {
+        return num_buckets;
+    }
+
+    size_t BucketSize(size_t bucket_index) const {
+        if (bucket_index >= num_buckets) {
+            throw std::out_of_range("Bucket index out of range");
+        }
+        absl::ReaderMutexLock lock(&buckets[bucket_index]->mutex);
+        return buckets[bucket_index]->cache_map.size();
+    }
+};
+
+#endif  // LRU_MAP
+
+
+
+
+
+
+
+
+
+
+// #include "absl/container/flat_hash_map.h"
+// #include "absl/synchronization/mutex.h"
+// #include <functional>
+// #include <list>
+// #include <memory>
+// #include <optional>
+// #include <vector>
+
+// // Forward declaration for Objective-C interoperability
+// #ifdef __OBJC__
+// #import <Foundation/Foundation.h>
+// // Specialized hash for NSString*
+// namespace absl {
+// namespace container_internal {
+// template <>
+// struct HashEq<NSString*> {
+//   size_t operator()(NSString* const& str) const {
+//     return str.hash;
+//   }
+//   bool operator()(NSString* const& a, NSString* const& b) const {
+//     return [a isEqual:b];
+//   }
+// };
+// }  // namespace container_internal
+// }  // namespace absl
+// #endif
+
+// template <typename Key, typename Value>
+// class ShardedLRUCache {
+//  public:
+//   ShardedLRUCache(size_t size, size_t num_shards = 16)
+//       : total_capacity_(size), num_buckets_(num_shards) {
+//     if (size == 0) throw std::invalid_argument("Cache size must be positive");
+//     if (num_shards == 0) throw std::invalid_argument("Number of shards must be positive");
+//     if (num_shards > size) throw std::invalid_argument("Number of shards cannot exceed cache size");
+
+//     buckets_.reserve(num_shards);
+//     for (size_t i = 0; i < num_shards; ++i) {
+//       buckets_.push_back(std::make_unique<Bucket>());
+//     }
+//   }
+
+//   // // Handles get with a value producer function
+//   // Value GetOrSet(const Key& key, std::function<Value()> producer) {
+//   //   size_t bucket_idx = GetBucketIndex(key);
+//   //   Bucket& bucket = *buckets_[bucket_idx];
+
+//   //   // First try with just a reader lock on the bucket
+//   //   {
+//   //     absl::ReaderMutexLock bucket_lock(&bucket.mutex);
+//   //     auto it = bucket.cache_map.find(key);
+//   //     if (it != bucket.cache_map.end()) {
+//   //       // Found in cache, make a copy of the value
+//   //       Value result = it->second->value;
+
+//   //       // Update LRU position with proper lock order (need both locks briefly)
+//   //       bucket_lock.Release();  // Use Release instead of explicit Unlock
+//   //       {
+//   //         absl::MutexLock lru_lock(&lru_mutex_);
+//   //         absl::MutexLock bucket_write_lock(&bucket.mutex);
+
+//   //         // Check again after re-acquiring locks
+//   //         it = bucket.cache_map.find(key);
+//   //         if (it != bucket.cache_map.end()) {
+//   //           Touch(it->second);
+//   //         }
+//   //       }
+//   //       return result;
+//   //     }
+//   //   }
+
+//   //   // Not found, produce new value
+//   //   Value new_value = producer();
+
+//   //   // Now we need to insert the new value with both locks
+//   //   {
+//   //     // Acquire the global lock first
+//   //     absl::MutexLock lru_lock(&lru_mutex_);
+
+//   //     // Then the bucket lock
+//   //     absl::MutexLock bucket_lock(&bucket.mutex);
+
+//   //     // Check again after acquiring locks
+//   //     auto it = bucket.cache_map.find(key);
+//   //     if (it != bucket.cache_map.end()) {
+//   //       Touch(it->second);
+//   //       return it->second->value;
+//   //     }
+
+//   //     // Ensure we have capacity
+//   //     if (lru_list_.size() >= total_capacity_) {
+//   //       // Find bucket of the last node
+//   //       const Node& oldest_node = lru_list_.back();
+//   //       size_t oldest_bucket_idx = oldest_node.bucket_index;
+//   //       Key oldest_key = oldest_node.key;
+
+//   //       // If we need to evict from a different bucket, acquire that lock
+//   //       if (oldest_bucket_idx != bucket_idx) {
+//   //         // We need to lock another bucket, but we already hold the lru_mutex_
+//   //         // and the current bucket's mutex. This can lead to a deadlock.
+//   //         // Solution: Remove the node from LRU list first, then handle map entry
+
+//   //         // Remove from LRU list first (safe since we have lru_mutex_)
+//   //         lru_list_.pop_back();
+
+//   //         // Now acquire the other bucket's lock to remove from map
+//   //         absl::MutexLock other_bucket_lock(&buckets_[oldest_bucket_idx]->mutex);
+//   //         buckets_[oldest_bucket_idx]->cache_map.erase(oldest_key);
+//   //       } else {
+//   //         // Evicting from same bucket we already have locked
+//   //         bucket.cache_map.erase(oldest_key);
+//   //         lru_list_.pop_back();
+//   //       }
+//   //     }
+
+//   //     // Insert new node at front of LRU list
+//   //     lru_list_.emplace_front(key, new_value, bucket_idx);
+//   //     bucket.cache_map[key] = lru_list_.begin();
+
+//   //     return new_value;
+//   //   }
+//   // }
+
+//   // Add or update a key-value pair
+//   void Put(const Key& key, const Value& value) {
+//     size_t bucket_idx = GetBucketIndex(key);
+//     Bucket& bucket = *buckets_[bucket_idx];
+
+//     // Always acquire global lock first, then bucket lock
+//     absl::MutexLock lru_lock(&lru_mutex_);
+//     absl::MutexLock bucket_lock(&bucket.mutex);
+
+//     auto it = bucket.cache_map.find(key);
+//     if (it != bucket.cache_map.end()) {
+//       // Key exists, update value and move to front
+//       it->second->value = value;
+//       Touch(it->second);
+//       return;
+//     }
+
+//     // If at capacity, evict
+//     if (lru_list_.size() >= total_capacity_) {
+//       // Same eviction logic as in GetOrSet
+//       const Node& oldest_node = lru_list_.back();
+//       size_t oldest_bucket_idx = oldest_node.bucket_index;
+//       Key oldest_key = oldest_node.key;
+
+//       if (oldest_bucket_idx != bucket_idx) {
+//         // Remove from LRU list first
+//         lru_list_.pop_back();
+
+//         // Now remove from the map of the other bucket
+//         absl::MutexLock other_bucket_lock(&buckets_[oldest_bucket_idx]->mutex);
+//         buckets_[oldest_bucket_idx]->cache_map.erase(oldest_key);
+//       } else {
+//         // Evicting from same bucket we have locked
+//         bucket.cache_map.erase(oldest_key);
+//         lru_list_.pop_back();
+//       }
+//     }
+
+//     // Insert new node
+//     lru_list_.emplace_front(key, value, bucket_idx);
+//     bucket.cache_map[key] = lru_list_.begin();
+//   }
+
+//   std::optional<Value> Get(const Key& key) {
+//       size_t bucket_idx = GetBucketIndex(key);
+//       Bucket& bucket = *buckets_[bucket_idx];
+//       std::optional<Value> result;
+
+//       // First, try with just a reader lock to check existence and make a copy
+//       {
+//           absl::ReaderMutexLock bucket_lock(&bucket.mutex);
+//           auto it = bucket.cache_map.find(key);
+//           if (it != bucket.cache_map.end()) {
+//               // Found, make a copy
+//               result = it->second->value;
+//           }
+//       }
+
+//       // If found, update LRU order with proper locks
+//       if (result.has_value()) {
+//           // Acquire locks in proper order: global LRU lock first, then bucket lock
+//           absl::MutexLock lru_lock(&lru_mutex_);
+//           absl::MutexLock bucket_lock(&bucket.mutex);
+
+//           // Check again with locks held
+//           auto it = bucket.cache_map.find(key);
+//           if (it != bucket.cache_map.end()) {
+//               Touch(it->second);
+//           }
+//       }
+
+//       return result;
+//   }
+
+
+//   // // Get value if exists, updating LRU
+//   // std::optional<Value> Get(const Key& key) {
+//   //   Bucket& bucket = GetBucket(key);
+
+//   //   // Try with just a reader lock first
+//   //   {
+//   //     absl::ReaderMutexLock bucket_lock(&bucket.mutex);
+//   //     auto it = bucket.cache_map.find(key);
+//   //     if (it != bucket.cache_map.end()) {
+//   //       // Found, make a copy
+//   //       Value result = it->second->value;
+
+//   //       // Update LRU with proper lock order
+//   //       bucket_lock.Release();
+//   //       {
+//   //         absl::MutexLock lru_lock(&lru_mutex_);
+//   //         absl::MutexLock bucket_write_lock(&bucket.mutex);
+
+//   //         // Check again with locks held
+//   //         it = bucket.cache_map.find(key);
+//   //         if (it != bucket.cache_map.end()) {
+//   //           Touch(it->second);
+//   //         }
+//   //       }
+//   //       return result;
+//   //     }
+//   //   }
+
+//   //   return std::nullopt;
+//   // }
+
+//   // Read value without affecting LRU order
+//   std::optional<Value> Peek(const Key& key) const {
+//     const Bucket& bucket = GetBucket(key);
+
+//     absl::ReaderMutexLock bucket_lock(&bucket.mutex);
+//     auto it = bucket.cache_map.find(key);
+//     if (it == bucket.cache_map.end()) {
+//       return std::nullopt;
+//     }
+
+//     return it->second->value;
+//   }
+
+//   // Get current number of entries
+//   size_t Size() const {
+//     absl::ReaderMutexLock lru_lock(&lru_mutex_);
+//     return lru_list_.size();
+//   }
+
+//   // Clear all entries
+//   void Clear() {
+//     absl::MutexLock lru_lock(&lru_mutex_);
+
+//     // Lock all buckets (risky but necessary for full clear)
+//     std::vector<std::unique_ptr<absl::MutexLock>> bucket_locks;
+//     bucket_locks.reserve(num_buckets_);
+
+//     for (auto& bucket : buckets_) {
+//       bucket_locks.push_back(std::make_unique<absl::MutexLock>(&bucket->mutex));
+//       bucket->cache_map.clear();
+//     }
+
+//     lru_list_.clear();
+//   }
+
+//   // Get number of buckets
+//   size_t BucketCount() const {
+//     return num_buckets_;
+//   }
+
+//   // Get size of specific bucket
+//   size_t BucketSize(size_t bucket_index) const {
+//     if (bucket_index >= num_buckets_) {
+//       throw std::out_of_range("Bucket index out of range");
+//     }
+//     absl::ReaderMutexLock lock(&buckets_[bucket_index]->mutex);
+//     return buckets_[bucket_index]->cache_map.size();
+//   }
+
+//  private:
+//   // Node structure for doubly-linked list
+//   struct Node {
+//     Node(const Key& k, const Value& v, size_t b)
+//         : key(k), value(v), bucket_index(b) {}
+
+//     Key key;
+//     Value value;
+//     size_t bucket_index;  // Track which bucket owns this node
+//   };
+
+//   // Bucket structure for sharding
+//   struct Bucket {
+//     absl::flat_hash_map<Key, typename std::list<Node>::iterator> cache_map;
+//     mutable absl::Mutex mutex;
+//   };
+
+//   // Hash function to determine bucket
+//   size_t GetBucketIndex(const Key& key) const {
+//     return absl::Hash<Key>{}(key) % num_buckets_;
+//   }
+
+//   // Get reference to appropriate bucket
+//   Bucket& GetBucket(const Key& key) {
+//     return *buckets_[GetBucketIndex(key)];
+//   }
+
+//   const Bucket& GetBucket(const Key& key) const {
+//     return *buckets_[GetBucketIndex(key)];
+//   }
+
+//   // Move node to front of LRU list (assumes lru_mutex_ is held)
+//   void Touch(typename std::list<Node>::iterator it) ABSL_EXCLUSIVE_LOCKS_REQUIRED(lru_mutex_) {
+//     lru_list_.splice(lru_list_.begin(), lru_list_, it);
+//   }
+
+//   // Global LRU list and its mutex
+//   std::list<Node> lru_list_;
+//   mutable absl::Mutex lru_mutex_;
+
+//   size_t total_capacity_;
+//   size_t num_buckets_;
+//   std::vector<std::unique_ptr<Bucket>> buckets_;
+// };
+
+
+
+
+
+
+
+
+
+// #include "absl/container/flat_hash_map.h"
+// #include "absl/synchronization/mutex.h"
+// #include <functional>
+// #include <list>
+// #include <memory>
+// #include <optional>
+// #include <vector>
+
+// // Forward declaration for Objective-C interoperability
+// #ifdef __OBJC__
+// #import <Foundation/Foundation.h>
+// // Specialized hash for NSString*
+// namespace absl {
+// namespace container_internal {
+// template <>
+// struct HashEq<NSString*> {
+//   size_t operator()(NSString* const& str) const {
+//     return str.hash;
+//   }
+//   bool operator()(NSString* const& a, NSString* const& b) const {
+//     return [a isEqual:b];
+//   }
+// };
+// }  // namespace container_internal
+// }  // namespace absl
+// #endif
+
+// template <typename Key, typename Value>
+// class ShardedLRUCache {
+//  public:
+//   ShardedLRUCache(size_t size, size_t num_shards = 16)
+//       : total_capacity_(size), num_buckets_(num_shards) {
+//     if (size == 0) throw std::invalid_argument("Cache size must be positive");
+//     if (num_shards == 0) throw std::invalid_argument("Number of shards must be positive");
+//     if (num_shards > size) throw std::invalid_argument("Number of shards cannot exceed cache size");
+
+//     buckets_.reserve(num_shards);
+//     for (size_t i = 0; i < num_shards; ++i) {
+//       buckets_.push_back(std::make_unique<Bucket>());
+//     }
+//   }
+
+//   // Add or update a key-value pair
+//   void Put(const Key& key, const Value& value) {
+//     size_t bucket_idx = GetBucketIndex(key);
+//     Bucket& bucket = *buckets_[bucket_idx];
+
+//     // Always acquire lru_mutex_ first for consistent lock ordering
+//     absl::MutexLock lru_lock(&lru_mutex_);
+//     {
+//       absl::MutexLock bucket_lock(&bucket.mutex);
+
+//       auto it = bucket.cache_map.find(key);
+//       if (it != bucket.cache_map.end()) {
+//         // Key exists, update value and move to front
+//         it->second->value = value;
+//         Touch(it->second);
+//         return;
+//       }
+
+//       // If at capacity, remove least recently used
+//       if (lru_list_.size() >= total_capacity_) {
+//         // EvictLRU();  // Note: this temporarily releases lru_mutex_
+//         const Node& lru_node = lru_list_.back();
+//         Bucket& lru_bucket = *buckets_[lru_node.bucket_index];
+
+//         if (&lru_bucket != &bucket) {
+//           // Need to lock the other bucket
+//           absl::MutexLock other_lock(&lru_bucket.mutex);
+//           lru_bucket.cache_map.erase(lru_node.key);
+//         } else {
+//           bucket.cache_map.erase(lru_node.key);
+//         }
+//         lru_list_.pop_back();
+//       }
+
+//       // Insert new node at front
+//       lru_list_.emplace_front(key, value, bucket_idx);
+//       bucket.cache_map[key] = lru_list_.begin();
+//     }
+//   }
+
+//   // Get value if exists, updating LRU
+//   std::optional<Value> Get(const Key& key) {
+//     Bucket& bucket = GetBucket(key);
+//     typename std::list<Node>::iterator node_it;
+//     bool found = false;
+//     Value result;
+
+//     // First check if the key exists
+//     {
+//       absl::ReaderMutexLock bucket_lock(&bucket.mutex);
+//       auto it = bucket.cache_map.find(key);
+//       if (it != bucket.cache_map.end()) {
+//         result = it->second->value;
+//         found = true;
+//       }
+//     }
+
+//     if (found) {
+//       // Now update LRU with consistent lock ordering
+//       absl::MutexLock lru_lock(&lru_mutex_);
+//       absl::ReaderMutexLock bucket_lock(&bucket.mutex);
+
+//       // Check again after lock
+//       auto it = bucket.cache_map.find(key);
+//       if (it != bucket.cache_map.end()) {
+//         Touch(it->second);
+//       }
+//       return result;
+//     }
+
+//     return std::nullopt;
+//   }
+
+//   // Read value without affecting LRU order
+//   std::optional<Value> Peek(const Key& key) const {
+//     const Bucket& bucket = GetBucket(key);
+
+//     absl::ReaderMutexLock bucket_lock(&bucket.mutex);
+//     auto it = bucket.cache_map.find(key);
+//     if (it == bucket.cache_map.end()) {
+//       return std::nullopt;
+//     }
+
+//     return it->second->value;
+//   }
+
+//   // Get current number of entries
+//   size_t Size() const {
+//     absl::ReaderMutexLock lru_lock(&lru_mutex_);
+//     return lru_list_.size();
+//   }
+
+//   // Clear all entries
+//   void Clear() {
+//     // Clear with consistent lock ordering
+//     absl::MutexLock lru_lock(&lru_mutex_);
+//     for (auto& bucket : buckets_) {
+//       absl::MutexLock bucket_lock(&bucket->mutex);
+//       bucket->cache_map.clear();
+//     }
+//     lru_list_.clear();
+//   }
+
+//   // Get number of buckets
+//   size_t BucketCount() const {
+//     return num_buckets_;
+//   }
+
+//   // Get size of specific bucket
+//   size_t BucketSize(size_t bucket_index) const {
+//     if (bucket_index >= num_buckets_) {
+//       throw std::out_of_range("Bucket index out of range");
+//     }
+//     absl::ReaderMutexLock lock(&buckets_[bucket_index]->mutex);
+//     return buckets_[bucket_index]->cache_map.size();
+//   }
+
+//  private:
+//   // Node structure for doubly-linked list
+//   struct Node {
+//     Node(const Key& k, const Value& v, size_t b)
+//         : key(k), value(v), bucket_index(b) {}
+
+//     Key key;
+//     Value value;
+//     size_t bucket_index;  // Track which bucket owns this node
+//   };
+
+//   // Bucket structure for sharding
+//   struct Bucket {
+//     absl::flat_hash_map<Key, typename std::list<Node>::iterator> cache_map;
+//     mutable absl::Mutex mutex;
+//   };
+
+//   // Hash function to determine bucket
+//   size_t GetBucketIndex(const Key& key) const {
+//     return absl::Hash<Key>{}(key) % num_buckets_;
+//   }
+
+//   // Get reference to appropriate bucket
+//   Bucket& GetBucket(const Key& key) {
+//     return *buckets_[GetBucketIndex(key)];
+//   }
+
+//   const Bucket& GetBucket(const Key& key) const {
+//     return *buckets_[GetBucketIndex(key)];
+//   }
+
+//   // Move node to front of LRU list (assumes lru_mutex_ is held)
+//   void Touch(typename std::list<Node>::iterator it) ABSL_EXCLUSIVE_LOCKS_REQUIRED(lru_mutex_) {
+//     lru_list_.splice(lru_list_.begin(), lru_list_, it);
+//   }
+
+//   // // Evict least recently used item when cache is full
+//   // void EvictLRU() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lru_mutex_) {
+//   //   if (lru_list_.empty()) return;
+
+//   //   const Node& lru_node = lru_list_.back();
+
+//   //   // First release lru_mutex_ to avoid lock ordering issues
+//   //   // We'll need to check again if the node is still valid after re-acquiring
+//   //   Key key_to_remove = lru_node.key;
+//   //   size_t bucket_index = lru_node.bucket_index;
+
+//   //   // Remove the node from the list before releasing the lock
+//   //   lru_list_.pop_back();
+
+//   //   // Now release lru_mutex_ and acquire bucket mutex to remove from map
+//   //   lru_mutex_.Unlock();
+//   //   {
+//   //     absl::MutexLock bucket_lock(&buckets_[bucket_index]->mutex);
+//   //     buckets_[bucket_index]->cache_map.erase(key_to_remove);
+//   //   }
+//   //   lru_mutex_.Lock();
+//   // }
+
+//   // Global LRU list and its mutex
+//   std::list<Node> lru_list_;
+//   mutable absl::Mutex lru_mutex_;
+
+//   size_t total_capacity_;
+//   size_t num_buckets_;
+//   std::vector<std::unique_ptr<Bucket>> buckets_;
+// };
+
+
+
+// // Handles get with a value producer function
+// Value GetOrSet(const Key& key, std::function<Value()> producer) {
+//   size_t bucket_idx = GetBucketIndex(key);
+//   Bucket& bucket = *buckets_[bucket_idx];
+//   Value result;
+//   bool found = false;
+
+//   // Try read-only access first to see if the key exists
+//   {
+//     absl::ReaderMutexLock bucket_lock(&bucket.mutex);
+//     auto it = bucket.cache_map.find(key);
+//     if (it != bucket.cache_map.end()) {
+//       result = it->second->value;
+//       found = true;
+//     }
+//   }
+
+//   // If found, update LRU status and return
+//   if (found) {
+//     // Update LRU list with consistent lock ordering (lru_mutex first)
+//     absl::MutexLock lru_lock(&lru_mutex_);
+//     absl::ReaderMutexLock bucket_lock(&bucket.mutex);
+
+//     // Check again after locking
+//     auto it = bucket.cache_map.find(key);
+//     if (it != bucket.cache_map.end()) {
+//       Touch(it->second);
+//     }
+//     return result;
+//   }
+
+//   // Not found, produce new value
+//   result = producer();
+
+//   // Update cache with consistent lock ordering
+//   absl::MutexLock lru_lock(&lru_mutex_);
+//   {
+//     absl::MutexLock bucket_lock(&bucket.mutex);
+
+//     // Check again after acquiring locks
+//     auto it = bucket.cache_map.find(key);
+//     if (it != bucket.cache_map.end()) {
+//       Touch(it->second);
+//       return it->second->value;
+//     }
+
+//     // If at capacity, remove least recently used
+//     if (lru_list_.size() >= total_capacity_) {
+//       EvictLRU();  // Note: this temporarily releases lru_mutex_
+//     }
+
+//     // Insert new node at front
+//     lru_list_.emplace_front(key, result, bucket_idx);
+//     bucket.cache_map[key] = lru_list_.begin();
+//   }
+
+//   return result;
+// }
+
+
+
+// // Handles get with a value producer function
+// Value GetOrSet(const Key& key, std::function<Value()> producer) {
+//   size_t bucket_idx = GetBucketIndex(key);
+//   Bucket& bucket = *buckets_[bucket_idx];
+//   Value result;
+//   bool found = false;
+
+//   // Try read-only access first to see if the key exists
+//   {
+//     absl::ReaderMutexLock bucket_lock(&bucket.mutex);
+//     auto it = bucket.cache_map.find(key);
+//     if (it != bucket.cache_map.end()) {
+//       result = it->second->value;
+//       found = true;
+//     }
+//   }
+
+//   // If found, update LRU status and return
+//   if (found) {
+//     // Update LRU list with consistent lock ordering (lru_mutex first)
+//     absl::MutexLock lru_lock(&lru_mutex_);
+//     absl::ReaderMutexLock bucket_lock(&bucket.mutex);
+
+//     // Check again after locking
+//     auto it = bucket.cache_map.find(key);
+//     if (it != bucket.cache_map.end()) {
+//       Touch(it->second);
+//     }
+//     return result;
+//   }
+
+//   // Not found, produce new value
+//   result = producer();
+
+//   // Update cache with consistent lock ordering
+//   absl::MutexLock lru_lock(&lru_mutex_);
+//   {
+//     absl::MutexLock bucket_lock(&bucket.mutex);
+
+//     // Check again after acquiring locks
+//     auto it = bucket.cache_map.find(key);
+//     if (it != bucket.cache_map.end()) {
+//       Touch(it->second);
+//       return it->second->value;
+//     }
+
+//     // If at capacity, remove least recently used
+//     if (lru_list_.size() >= total_capacity_) {
+//       EvictLRU();  // Note: this temporarily releases lru_mutex_
+//     }
+
+//     // Insert new node at front
+//     lru_list_.emplace_front(key, result, bucket_idx);
+//     bucket.cache_map[key] = lru_list_.begin();
+//   }
+
+//   return result;
+// }
+
+
+
+
+// #include "absl/container/flat_hash_map.h"
+// #include "absl/synchronization/mutex.h"
+// #include <functional>
+// #include <list>
+// #include <memory>
+// #include <optional>
+// #include <vector>
+
+// // Forward declaration for Objective-C interoperability
+// #ifdef __OBJC__
+// #import <Foundation/Foundation.h>
+// // Specialized hash for NSString*
+// namespace absl {
+// namespace container_internal {
+// template <>
+// struct HashEq<NSString*> {
+//   size_t operator()(NSString* const& str) const {
+//     return str.hash;
+//   }
+//   bool operator()(NSString* const& a, NSString* const& b) const {
+//     return [a isEqual:b];
+//   }
+// };
+// }  // namespace container_internal
+// }  // namespace absl
+// #endif
+
+// template <typename Key, typename Value>
+// class ShardedLRUCache {
+//  private:
+//   // Node structure for doubly-linked list
+//   struct Node {
+//     Node(const Key& k, const Value& v, size_t b)
+//         : key(k), value(v), bucket_index(b) {}
+
+//     Key key;
+//     Value value;
+//     size_t bucket_index;  // Track which bucket owns this node
+//   };
+
+//   // Bucket structure for sharding
+//   struct Bucket {
+//     absl::flat_hash_map<Key, typename std::list<Node>::iterator> cache_map;
+//     mutable absl::Mutex mutex;
+//   };
+
+//   // Global LRU list and its mutex
+//   std::list<Node> lru_list;
+//   mutable absl::Mutex lru_mutex;
+
+//   size_t total_capacity;
+//   size_t num_buckets;
+//   std::vector<std::unique_ptr<Bucket>> buckets;
+
+//   // Hash function to determine bucket
+//   size_t GetBucketIndex(const Key& key) const {
+//     return absl::Hash<Key>{}(key) % num_buckets;
+//   }
+
+//   // Get reference to appropriate bucket
+//   Bucket& GetBucket(const Key& key) {
+//     return *buckets[GetBucketIndex(key)];
+//   }
+
+//   const Bucket& GetBucket(const Key& key) const {
+//     return *buckets[GetBucketIndex(key)];
+//   }
+
+//   // Move node to front of LRU list (assumes lru_mutex is held)
+//   void Touch(typename std::list<Node>::iterator it) ABSL_EXCLUSIVE_LOCKS_REQUIRED(lru_mutex) {
+//     lru_list.splice(lru_list.begin(), lru_list, it);
+//   }
+
+//   // Evict least recently used item when cache is full
+//   void EvictLru() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lru_mutex) {
+//     if (lru_list.empty()) return;
+
+//     const Node& lru_node = lru_list.back();
+//     Bucket& lru_bucket = *buckets[lru_node.bucket_index];
+
+//     {
+//       absl::MutexLock lock(&lru_bucket.mutex);
+//       lru_bucket.cache_map.erase(lru_node.key);
+//     }
+
+//     lru_list.pop_back();
+//   }
+
+//  public:
+//   ShardedLRUCache(size_t size, size_t num_shards = 16)
+//       : total_capacity(size), num_buckets(num_shards) {
+//     if (size == 0) throw std::invalid_argument("Cache size must be positive");
+//     if (num_shards == 0) throw std::invalid_argument("Number of shards must be positive");
+//     if (num_shards > size) throw std::invalid_argument("Number of shards cannot exceed cache size");
+
+//     buckets.reserve(num_shards);
+//     for (size_t i = 0; i < num_shards; ++i) {
+//       buckets.push_back(std::make_unique<Bucket>());
+//     }
+//   }
+
+//   // Add or update a key-value pair
+//   void Put(const Key& key, const Value& value) {
+//     size_t bucket_idx = GetBucketIndex(key);
+//     Bucket& bucket = *buckets[bucket_idx];
+
+//     absl::MutexLock lru_lock(&lru_mutex);
+//     absl::MutexLock bucket_lock(&bucket.mutex);
+
+//     auto it = bucket.cache_map.find(key);
+//     if (it != bucket.cache_map.end()) {
+//       // Key exists, update value and move to front
+//       it->second->value = value;
+//       Touch(it->second);
+//       return;
+//     }
+
+//     // If at capacity, remove least recently used
+//     if (lru_list.size() >= total_capacity) {
+//       EvictLru();
+//     }
+
+//     // Insert new node at front
+//     lru_list.emplace_front(key, value, bucket_idx);
+//     bucket.cache_map[key] = lru_list.begin();
+//   }
+
+//   // Get value if exists, updating LRU
+//   std::optional<Value> Get(const Key& key) {
+//     Bucket& bucket = GetBucket(key);
+
+//     absl::ReaderMutexLock bucket_lock(&bucket.mutex);
+//     auto it = bucket.cache_map.find(key);
+//     if (it == bucket.cache_map.end()) {
+//       return std::nullopt;
+//     }
+
+//     // Need write lock for LRU list modification
+//     {
+//       absl::MutexLock lru_lock(&lru_mutex);
+//       Touch(it->second);
+//     }
+//     return it->second->value;
+//   }
+
+//   // Read value without affecting LRU order
+//   std::optional<Value> Peek(const Key& key) const {
+//     const Bucket& bucket = GetBucket(key);
+
+//     absl::ReaderMutexLock bucket_lock(&bucket.mutex);
+//     auto it = bucket.cache_map.find(key);
+//     if (it == bucket.cache_map.end()) {
+//       return std::nullopt;
+//     }
+
+//     return it->second->value;
+//   }
+
+//   // Check if a value exists without affecting LRU order
+//   bool Contains(const Key& key) const {
+//     const Bucket& bucket = GetBucket(key);
+
+//     absl::ReaderMutexLock bucket_lock(&bucket.mutex);
+//     auto it = bucket.cache_map.find(key);
+//     return it != bucket.cache_map.end();
+//   }
+
+//   // Get current number of entries
+//   size_t Size() const {
+//     absl::ReaderMutexLock lru_lock(&lru_mutex);
+//     return lru_list.size();
+//   }
+
+//   // Clear all entries
+//   void Clear() {
+//     absl::MutexLock lru_lock(&lru_mutex);
+//     for (auto& bucket : buckets) {
+//       absl::MutexLock bucket_lock(&bucket->mutex);
+//       bucket->cache_map.clear();
+//     }
+//     lru_list.clear();
+//   }
+
+//   // Get number of buckets
+//   size_t BucketCount() const {
+//     return num_buckets;
+//   }
+
+//   // Get size of specific bucket
+//   size_t BucketSize(size_t bucket_index) const {
+//     if (bucket_index >= num_buckets) {
+//       throw std::out_of_range("Bucket index out of range");
+//     }
+//     absl::ReaderMutexLock lock(&buckets[bucket_index]->mutex);
+//     return buckets[bucket_index]->cache_map.size();
+//   }
+// };
+
+
+// #include <atomic>
+// #include <iostream>
+// #include <list>
+// #include <memory>
+// #include <optional>
+// #include <utility>
+// #include <vector>
+
+// #include "absl/container/flat_hash_map.h"
+// #include "absl/hash/hash.h"
+// #include "absl/synchronization/mutex.h"
+
+// // Forward declaration of the ShardedLRUCache
+// template <typename Key, typename Value>
+// class ShardedLRUCache;
+
+// // A single shard of the LRU cache
+// template <typename Key, typename Value>
+// class LRUCacheShard {
+//  public:
+//   explicit LRUCacheShard(ShardedLRUCache<Key, Value>* parent)
+//       : parent_(parent) {}
+
+//   // Get value by key, return nullopt if not found
+//   std::optional<Value> Get(const Key& key) {
+//     absl::MutexLock lock(&mutex_);
+//     auto it = cache_map_.find(key);
+//     if (it == cache_map_.end()) {
+//       return std::nullopt;
+//     }
+
+//     // Move the accessed item to the front of the list (most recently used)
+//     access_list_.splice(access_list_.begin(), access_list_,
+//                         it->second.list_iter);
+//     return it->second.value;
+//   }
+
+//   // Insert or update a key-value pair
+//   bool Put(const Key& key, const Value& value) {
+//     absl::MutexLock lock(&mutex_);
+//     auto it = cache_map_.find(key);
+
+//     if (it != cache_map_.end()) {
+//       // Key exists, update value and move to front
+//       it->second.value = value;
+//       access_list_.splice(access_list_.begin(), access_list_,
+//                           it->second.list_iter);
+//       return true;
+//     }
+
+//     // Check if we can add a new item (global capacity check)
+//     if (!parent_->CanAddNewItem()) {
+//       // Try to resize internally first
+//       if (!TryEvictLRU()) {
+//         return false;  // Cannot add more items
+//       }
+//     }
+
+//     // Insert new item at the front (most recently used)
+//     access_list_.push_front(key);
+//     cache_map_[key] = {value, access_list_.begin()};
+//     parent_->IncrementItemCount();
+//     return true;
+//   }
+
+//   // Check if key exists in cache
+//   bool Contains(const Key& key) const {
+//     absl::ReaderMutexLock lock(&mutex_);
+//     return cache_map_.find(key) != cache_map_.end();
+//   }
+
+//   // Get current size of this shard
+//   size_t Size() const {
+//     absl::ReaderMutexLock lock(&mutex_);
+//     return cache_map_.size();
+//   }
+
+//   // Clear the shard
+//   void Clear() {
+//     absl::MutexLock lock(&mutex_);
+//     size_t old_size = cache_map_.size();
+//     cache_map_.clear();
+//     access_list_.clear();
+//     parent_->DecrementItemCount(old_size);
+//   }
+
+//   // Try to evict the least recently used item from this shard
+//   bool TryEvictLRU() {
+//     // Caller should hold the mutex
+//     if (access_list_.empty()) {
+//       return false;
+//     }
+
+//     const Key& lru_key = access_list_.back();
+//     std::cout << "erasing key: " << lru_key << std::endl;
+//     cache_map_.erase(lru_key);
+//     access_list_.pop_back();
+//     parent_->DecrementItemCount(1);
+//     return true;
+//   }
+
+//  private:
+//   friend class ShardedLRUCache<Key, Value>;
+
+//   struct CacheEntry {
+//     Value value;
+//     typename std::list<Key>::iterator list_iter;
+//   };
+
+//   ShardedLRUCache<Key, Value>* parent_;
+//   absl::flat_hash_map<Key, CacheEntry> cache_map_;
+//   std::list<Key> access_list_;
+//   mutable absl::Mutex mutex_;
+// };
+
+// // The main sharded LRU cache
+// template <typename Key, typename Value>
+// class ShardedLRUCache {
+//  public:
+//   ShardedLRUCache(size_t capacity, size_t num_shards = 16)
+//       : capacity_(capacity), item_count_(0) {
+//     shards_.reserve(num_shards);
+//     for (size_t i = 0; i < num_shards; ++i) {
+//       shards_.emplace_back(std::make_unique<LRUCacheShard<Key, Value>>(this));
+//     }
+//   }
+
+//   // Get a value from the cache
+//   std::optional<Value> Get(const Key& key) {
+//     auto shard = GetShard(key);
+//     return shard->Get(key);
+//   }
+
+//   // Put a value into the cache
+//   bool Put(const Key& key, const Value& value) {
+//     auto shard = GetShard(key);
+//     return shard->Put(key, value);
+//   }
+
+//   // Check if a key exists in the cache
+//   bool Contains(const Key& key) const {
+//     auto shard = GetShard(key);
+//     return shard->Contains(key);
+//   }
+
+//   // Get the total number of items in the cache
+//   size_t Size() const { return item_count_.load(std::memory_order_relaxed); }
+
+//   // Clear the entire cache
+//   void Clear() {
+//     for (auto& shard : shards_) {
+//       shard->Clear();
+//     }
+//   }
+
+//   // Number of shards
+//   size_t NumShards() const { return shards_.size(); }
+
+//  protected:
+//   friend class LRUCacheShard<Key, Value>;
+
+//   // Check if a new item can be added to the cache
+//   bool CanAddNewItem() const {
+//     return item_count_.load(std::memory_order_relaxed) < capacity_;
+//   }
+
+//   // Increment the global item count
+//   void IncrementItemCount() {
+//     item_count_.fetch_add(1, std::memory_order_relaxed);
+//   }
+
+//   // Decrement the global item count
+//   void DecrementItemCount(size_t count) {
+//     item_count_.fetch_sub(count, std::memory_order_relaxed);
+//   }
+
+//  private:
+//   // Get the shard for a specific key
+//   LRUCacheShard<Key, Value>* GetShard(const Key& key) const {
+//     size_t shard_index = absl::Hash<Key>()(key) % shards_.size();
+//     return shards_[shard_index].get();
+//   }
+
+//   std::vector<std::unique_ptr<LRUCacheShard<Key, Value>>> shards_;
+//   size_t capacity_;
+//   std::atomic<size_t> item_count_;
+// };
+
+#endif  // SANTA__COMMON__CONCURRENTLRUMAP_H

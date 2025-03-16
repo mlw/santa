@@ -57,6 +57,25 @@ cc_library(
     ],
 )
 
+objc_library(
+    name = "ConcurrentLRUMap",
+    hdrs = ["ConcurrentLRUMap.h"],
+    deps = [
+        ":SantaCache",
+        "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/hash",
+        "@com_google_absl//absl/synchronization",
+    ],
+)
+
+santa_unit_test(
+    name = "ConcurrentLRUMapTest",
+    srcs = ["ConcurrentLRUMapTest.mm"],
+    deps = [
+        ":ConcurrentLRUMap",
+    ],
+)
+
 santa_unit_test(
     name = "SantaCacheTest",
     srcs = ["SantaCacheTest.mm"],
