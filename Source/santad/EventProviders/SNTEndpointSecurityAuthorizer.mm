@@ -32,6 +32,13 @@ using santa::EndpointSecurityAPI;
 using santa::EventDisposition;
 using santa::Message;
 
+__BEGIN_DECLS
+
+/* code sign operations */
+int csops(pid_t pid, unsigned int ops, void *useraddr, size_t usersize);
+
+__END_DECLS
+
 @interface SNTEndpointSecurityAuthorizer ()
 @property SNTCompilerController *compilerController;
 @property SNTExecutionController *execController;
@@ -83,6 +90,23 @@ using santa::Message;
     // Prevent caching if a probe is interested in the process. But don't re-enable
     // caching if it was already previously disabled.
     cacheable = cacheable && (interest == santa::ProbeInterest::kUninterested);
+  }
+
+  if (msg->event_type == ES_EVENT_TYPE_AUTH_EXEC) {
+    if (strcmp(msg->event.exec.target->executable->path.data,
+               "/Applications/VLC.app/Contents/MacOS/VLC") == 0 ||
+        strcmp(msg->event.exec.target->executable->path.data,
+               "/opt/homebrew/Cellar/python@3.13/3.13.0_1/Frameworks/Python.framework/Versions/"
+               "3.13/Resources/Python.app/Contents/MacOS/Python") == 0 ||
+        strcmp(msg->event.exec.target->executable->path.data,
+               "/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/"
+               "Versions/3.9/Resources/Python.app/Contents/MacOS/Python") == 0) {
+      LOGE(@"FORCE LV: %x, %s", msg->event.exec.target->codesigning_flags,
+           msg->event.exec.target->executable->path.data);
+      uint64_t flag = CS_REQUIRE_LV;
+      csops(audit_token_to_pid(msg->event.exec.target->audit_token), 9 /* CS_OPS_SET_STATUS */,
+            &flag, sizeof(flag));
+    }
   }
 
   return [self respondToMessage:msg withAuthResult:result cacheable:cacheable];
