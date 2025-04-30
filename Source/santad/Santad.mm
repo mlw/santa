@@ -44,6 +44,8 @@
 #include "Source/santad/SNTDecisionCache.h"
 #include "Source/santad/TTYWriter.h"
 
+#include "google/cloud/storage/client.h"
+
 using santa::AuthResultCache;
 using santa::EndpointSecurityAPI;
 using santa::Enricher;
@@ -56,6 +58,10 @@ using santa::TTYWriter;
 using santa::Unit;
 using santa::WatchItems;
 
+namespace g = google::cloud;
+namespace gcs = google::cloud::storage;
+using ::google::cloud::StatusOr;
+
 void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logger> logger,
                 std::shared_ptr<Metrics> metrics, std::shared_ptr<santa::WatchItems> watch_items,
                 std::shared_ptr<Enricher> enricher,
@@ -66,6 +72,25 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                 std::shared_ptr<santa::PrefixTree<santa::Unit>> prefix_tree,
                 std::shared_ptr<TTYWriter> tty_writer,
                 std::shared_ptr<santa::santad::process_tree::ProcessTree> process_tree) {
+  dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+    LOGE(@"Create GCS client");
+    gcs::Client client = gcs::Client::CreateDefaultClient().value();
+    LOGE(@"Do the upload...?");
+    // StatusOr<gcs::ObjectMetadata> metadata =
+    //     client.UploadFile("/private/tmp/foo", "playground-test-bucket-01964538",
+    //                       "hi_from_cc_world.txt", gcs::IfGenerationMatch(0));
+    StatusOr<gcs::ObjectMetadata> metadata =
+        client.UploadFile("/private/tmp/foo", "playground-test-bucket-01964538",
+                          "hi_from_cc_world.txt", g::Options{}.set<gcs::RetryPolicyOption>(
+                                      gcs::LimitedTimeRetryPolicy(std::chrono::seconds(30)).clone()));
+    LOGE(@"Check metadata");
+    if (!metadata) {
+      ::google::cloud::Status s = metadata.status();
+      LOGE(@"Failed upload, status: %d: %s", s.code(), s.message().c_str());
+    } else {
+      LOGE(@"Successfully uploaded?");
+    }
+  });
   SNTConfigurator *configurator = [SNTConfigurator configurator];
 
   SNTDaemonControlController *dc =

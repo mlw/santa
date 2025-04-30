@@ -45,4 +45,10 @@ objc_library(
         remote = "https://github.com/erikdoe/ocmock",
     )
 
+    # git_repository(
+    #     name = "google-cloud-cpp",
+    #     remote = "https://github.com/googleapis/google-cloud-cpp.git",
+    #     commit = "fd230d991aff5fe22edc2e321155a72705832bde"
+    # )
+
 non_module_deps = module_extension(implementation = _non_module_deps_impl)
