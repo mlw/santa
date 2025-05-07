@@ -44,6 +44,8 @@
 #include "Source/santad/SNTDecisionCache.h"
 #include "Source/santad/TTYWriter.h"
 
+#include "rednose/src/cpp_api.rs.h"
+
 using santa::AuthResultCache;
 using santa::EndpointSecurityAPI;
 using santa::Enricher;
@@ -67,6 +69,17 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                 std::shared_ptr<TTYWriter> tty_writer,
                 std::shared_ptr<santa::santad::process_tree::ProcessTree> process_tree) {
   SNTConfigurator *configurator = [SNTConfigurator configurator];
+
+  // //
+  // // Begin Rust fun
+  // //
+  // rust::Box<rednose::AgentRef> agent_ref = rednose::new_agent_ref("santa", "2025.4");
+  // // rednose::AgentClock agent_clock;
+  // // rednose::ClientMode::is_monitor([configurator clientMode]);
+  // rednose::print_schema_doc();
+  // //
+  // // End Rust Fun
+  // //
 
   SNTDaemonControlController *dc =
       [[SNTDaemonControlController alloc] initWithAuthResultCache:auth_result_cache

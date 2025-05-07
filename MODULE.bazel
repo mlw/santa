@@ -4,6 +4,7 @@ bazel_dep(name = "apple_support", version = "1.19.0", repo_name = "build_bazel_a
 bazel_dep(name = "abseil-cpp", version = "20250127.0", repo_name = "com_google_absl")
 bazel_dep(name = "rules_cc", version = "0.1.1")
 bazel_dep(name = "rules_apple", version = "3.19.1", repo_name = "build_bazel_rules_apple")
+bazel_dep(name = "rules_rust", version = "0.60.0", repo_name = "build_bazel_rules_rust")
 bazel_dep(name = "rules_shell", version = "0.4.0", repo_name = "build_bazel_rules_shell")
 bazel_dep(name = "rules_swift", version = "2.7.0", repo_name = "build_bazel_rules_swift")
 bazel_dep(name = "rules_fuzzing", version = "0.5.2")
@@ -34,4 +35,23 @@ git_override(
     module_name = "hedron_compile_commands",
     commit = "f5fbd4cee671d8d908f37c83abaf70fba5928fc7",
     remote = "https://github.com/mikael-s-persson/bazel-compile-commands-extractor.git",
+)
+
+# Add cxx.rs dependency to satisfy rednose's requirement
+bazel_dep(name = "cxx.rs")
+git_override(
+    module_name = "cxx.rs",
+    commit = "926094d",
+    remote = "https://github.com/dtolnay/cxx",
+)
+
+bazel_dep(name = "rednose", repo_name = "rednose")
+git_override(
+    module_name = "rednose",
+    # commit = "8a81f88bb3baf1984d5948f03ae061814238ceb2",
+    # remote = "https://github.com/wowsignal-io/rednose",
+    commit = "f46ac51d8d87e973d098f1ae091961868ef3f396",  # branch = "mac",
+    patch_strip = 1,
+    patches = ["//external_patches/rednose:rednose.patch"],
+    remote = "https://github.com/the80srobot/rednose/",
 )

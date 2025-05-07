@@ -57,7 +57,7 @@ objc_library(
         "Commands/SNTCommandStatus.m",
         "Commands/SNTCommandSync.m",
         "Commands/SNTCommandVersion.m",
-        "main.m",
+        "main.mm",
     ] + select({
         "//:opt_build": [],
         "//conditions:default": [
@@ -92,6 +92,7 @@ objc_library(
         "//Source/common:SigningIDHelpers",
         "//Source/common:SystemResources",
         "@FMDB",
+        "@rednose//rednose:rednose-bridge",
     ],
 )
 

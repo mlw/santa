@@ -909,6 +909,7 @@ objc_library(
         "//Source/common:TelemetryEventMap",
         "//Source/common:Unit",
         "//Source/santad/ProcessTree:process_tree",
+        "@rednose//rednose:rednose-bridge",
     ],
 )
 

@@ -16,6 +16,8 @@
 
 #import "Source/santactl/SNTCommandController.h"
 
+#include "rednose/src/cpp_api.rs.h"
+
 ///
 ///  santactl is a command-line utility for managing Santa.
 ///  As it can be used for a number of distinct operations, its operation is split into different
@@ -39,6 +41,36 @@ void print_string(NSString *string) {
 int main(int argc, const char *argv[]) {
   // Do not buffer stdout
   setbuf(stdout, NULL);
+
+  //
+  // Begin Rust fun
+  //
+  rust::Box<rednose::AgentRef> agent_ref = rednose::new_agent_ref("santa", "2025.4");
+  const ::rednose::Agent &agent = agent_ref->_internal_lock();
+  const ::rednose::ClientMode &mode = agent.mode();
+  bool isMonitor = mode.is_monitor();
+  bool isLockdown = mode.is_lockdown();
+  rust::Str modeStr = ::rednose::client_mode_to_str(mode);
+  // NSString *result = [NSString stringWithUTF8String:modeStr.data()];
+  NSString *result = [[NSString alloc] initWithBytes:modeStr.data()
+                                              length:modeStr.size()
+                                            encoding:NSUTF8StringEncoding];
+  NSLog(@"Is monitor: %d, is lockdown: %d, str: %s", isMonitor, isLockdown, modeStr.data());
+  NSLog(@"mode ns str: %@", result);
+
+  rust::Str os_build = agent.os_build();
+  result = [[NSString alloc] initWithBytes:os_build.data()
+                                    length:modeStr.size()
+                                  encoding:NSUTF8StringEncoding];
+  NSLog(@"os_build ns str: %@", result);
+  agent_ref->_internal_release();
+  // rednose::AgentClock agent_clock;
+  // rednose::ClientMode::is_monitor([configurator clientMode]);
+  // rednose::print_schema_doc();
+  // rednose::client_mode_to_str(::rednose::ClientMode::Lockdown);
+  //
+  // End Rust Fun
+  //
 
   @autoreleasepool {
     NSMutableArray *arguments = [[[NSProcessInfo processInfo] arguments] mutableCopy];

@@ -1,0 +1,13 @@
+diff --git a/rednose/BUILD b/rednose/BUILD
+index abcdefg..hijklmn 100644
+--- a/rednose/BUILD
++++ b/rednose/BUILD
+@@ -3,7 +3,7 @@
+ # SPDX-License-Identifier: Apache-2.0
+ # Copyright (c) 2025 Adam Sindelar
+ 
+-load("@//:rust.bzl", "rust_cxx_bridge")
++load("@cxx.rs//tools/bazel:rust_cxx_bridge.bzl", "rust_cxx_bridge")
+ load("@crate_index//:defs.bzl", "aliases", "all_crate_deps")
+ load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_test")
+ load("@rules_rust//rust:defs.bzl", "rust_library", "rust_static_library", "rust_test")
