@@ -39,6 +39,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
                          customURL:(NSString *)customURL
                          timestamp:(NSUInteger)timestamp
                            comment:(NSString *)comment
+                       gracePeriod:(NSInteger)gracePeriod
                              error:(NSError **)error {
   self = [super init];
   if (self) {
@@ -149,6 +150,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
     _customURL = customURL;
     _timestamp = timestamp;
     _comment = comment;
+    _gracePeriod = gracePeriod;
   }
   return self;
 }
@@ -165,6 +167,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
                         customURL:customURL
                         timestamp:0
                           comment:nil
+                          gracePeriod:-1
                             error:nil];
   // Initialize timestamp to current time if rule is transitive.
   if (self && state == SNTRuleStateAllowTransitive) {
@@ -293,6 +296,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
                         customURL:customURL
                         timestamp:0
                           comment:nil
+                          gracePeriod:-1
                             error:error];
 }
 
@@ -310,6 +314,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
   ENCODE(coder, customURL);
   ENCODE_BOXABLE(coder, timestamp);
   ENCODE(coder, comment);
+  ENCODE_BOXABLE(coder, gracePeriod);
 }
 
 - (instancetype)initWithCoder:(NSCoder *)decoder {
@@ -322,6 +327,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
     DECODE(decoder, customURL, NSString);
     DECODE_SELECTOR(decoder, timestamp, NSNumber, unsignedIntegerValue);
     DECODE(decoder, comment, NSString);
+    DECODE_SELECTOR(decoder, gracePeriod, NSNumber, intValue);
   }
   return self;
 }
@@ -384,8 +390,8 @@ static const NSUInteger kExpectedTeamIDLength = 10;
 
 - (NSString *)description {
   return [NSString
-      stringWithFormat:@"SNTRule: Identifier: %@, State: %ld, Type: %ld, Timestamp: %lu",
-                       self.identifier, self.state, self.type, (unsigned long)self.timestamp];
+      stringWithFormat:@"SNTRule: Identifier: %@, State: %ld, Type: %ld, Timestamp: %lu, Grace Period: %ld",
+                       self.identifier, self.state, self.type, (unsigned long)self.timestamp, self.gracePeriod];
 }
 
 #pragma mark Last-access Timestamp

@@ -14,6 +14,7 @@
 /// limitations under the License.
 
 #import "Source/gui/SNTNotificationManager.h"
+#include "Source/gui/SNTKillOnStartupWindowController.h"
 
 #import <Foundation/Foundation.h>
 #import <UserNotifications/UserNotifications.h>
@@ -422,6 +423,20 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
                                                       configState:configState];
 
   [self queueMessage:pendingMsg enableSilences:YES];
+}
+
+- (void)postKillOnStartup:(NSArray<SNTKillEvent*>*)events
+            customMessage:(NSString *)message
+                customURL:(NSString *)url {
+  LOGE(@"Got some events to display... %ld", events.count);
+  SNTKillOnStartupWindowController *pendingMsg =
+    [[SNTKillOnStartupWindowController alloc] initWithEvents:events customMsg:message customURL:url];
+
+  [self queueMessage:pendingMsg enableSilences:NO];
+}
+
+- (void)postKillOnStartupKilled:(pid_t)pid {
+
 }
 
 // XPC handler. The sync service requests the APNS token, by way of the daemon.

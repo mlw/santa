@@ -104,4 +104,6 @@ const static NSString *kBlockLongPath = @"BlockLongPath";
 - (void)updateEntitlementsPrefixFilter:(NSArray<NSString *> *)filter;
 - (void)updateEntitlementsTeamIDFilter:(NSArray<NSString *> *)filter;
 
+- (void)thisMachineKillsProcesses;
+
 @end

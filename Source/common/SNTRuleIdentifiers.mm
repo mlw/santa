@@ -15,6 +15,52 @@
 #import "Source/common/SNTRuleIdentifiers.h"
 
 #import "Source/common/CoderMacros.h"
+#import "Source/common/MOLCertificate.h"
+
+struct RuleIdentifiers CreateRuleIDs(SNTSigningStatus signingStatus, NSString *cdhash, NSString *binarySHA256, NSString *signingID,
+  NSString *certificateSHA256, NSString *teamID) {
+  struct RuleIdentifiers ruleIDs;
+
+  // Waterfall thru the signing status in order of most-to-least permissive
+  // in terms of identifiers allowed for policy match search. Fields from
+  // the given SNTCachedDecision are assigned only when valid for a given
+  // signing status.
+  //
+  // Do not evaluate TeamID/SigningID rules for dev-signed code based on the
+  // assumption that orgs are generally more relaxed about dev signed cert
+  // protections and users can more easily produce dev-signed code that
+  // would otherwise be inadvertently allowed.
+  //
+  // Note: All labels fall through.
+  // clang-format off
+  switch (signingStatus) {
+    case SNTSigningStatusProduction:
+      ruleIDs.signingID = signingID;
+      ruleIDs.teamID = teamID;
+      OS_FALLTHROUGH;
+    case SNTSigningStatusDevelopment:
+      ruleIDs.certificateSHA256 = certificateSHA256;
+      OS_FALLTHROUGH;
+    case SNTSigningStatusAdhoc:
+      ruleIDs.cdhash = cdhash;
+      OS_FALLTHROUGH;
+    case SNTSigningStatusInvalid:
+      OS_FALLTHROUGH;
+    case SNTSigningStatusUnsigned:
+      // We don't consider binary rules on this path
+      ruleIDs.binarySHA256 = nil;
+      break;
+  }
+  // clang-format on
+
+  return ruleIDs;
+}
+struct RuleIdentifiers CreateRuleIDsWithCodesignInfo(SNTSigningStatus signingStatus, MOLCodesignChecker *csc) {
+  return CreateRuleIDs(signingStatus, csc.cdhash, nil, csc.signingID, csc.leafCertificate.SHA256, csc.teamID);
+}
+struct RuleIdentifiers CreateRuleIDsWithCachedDecision(SNTCachedDecision *cd) {
+  return CreateRuleIDs(cd.signingStatus, cd.cdhash, cd.sha256, cd.signingID, cd.certSHA256, cd.teamID);
+}
 
 @implementation SNTRuleIdentifiers
 

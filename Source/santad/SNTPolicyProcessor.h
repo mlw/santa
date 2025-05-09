@@ -68,8 +68,9 @@
 /// Updates a decision for a given file and agent configuration.
 ///
 /// Returns YES if the decision requires no futher processing NO otherwise.
-- (BOOL)decision:(nonnull SNTCachedDecision *)cd
-                forRule:(nonnull SNTRule *)rule
-    withTransitiveRules:(BOOL)transitive;
-
+// - (BOOL)decision:(nonnull SNTCachedDecision *)cd
+//                 forRule:(nonnull SNTRule *)rule
+//     withTransitiveRules:(BOOL)transitive;
+- (SNTEventState)decisionForRule:(nonnull SNTRule *)rule
+    withTransitiveRules:(BOOL)enableTransitiveRules;
 @end

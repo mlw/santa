@@ -35,6 +35,21 @@ swift_library(
 )
 
 swift_library(
+    name = "SNTKillOnStartupWindowView",
+    srcs = ["SNTKillOnStartupWindowView.swift"],
+    generates_header = 1,
+    deps = [
+        ":SNTMessageView",
+        "//Source/common:CertificateHelpers",
+        "//Source/common:SNTBlockMessage_SantaGUI",
+        "//Source/common:SNTCommonEnums",
+        "//Source/common:SNTConfigState",
+        "//Source/common:SNTConfigurator",
+        "//Source/common:SNTStoredEvent",
+    ],
+)
+
+swift_library(
     name = "SNTDeviceMessageWindowView",
     srcs = [
         "SNTDeviceMessageWindowView.swift",
@@ -63,6 +78,27 @@ swift_library(
 )
 
 objc_library(
+    name = "SNTMessageWindowController",
+    srcs = ["SNTMessageWindowController.m"],
+    hdrs = ["SNTMessageWindowController.h"],
+)
+
+objc_library(
+    name = "SNTKillOnStartupWindowController",
+    srcs = ["SNTKillOnStartupWindowController.mm"],
+    hdrs = ["SNTKillOnStartupWindowController.h"],
+    deps = [
+        ":SNTKillOnStartupWindowView",
+        ":SNTMessageWindowController",
+        "//Source/common:SNTBlockMessage_SantaGUI",
+        "//Source/common:SNTConfigurator",
+        "//Source/common:SNTXPCControlInterface",
+        "//Source/common:MOLXPCConnection",
+        "//Source/common:SNTStoredEvent",
+    ],
+)
+
+objc_library(
     name = "SantaGUI_lib",
     srcs = [
         "SNTAboutWindowController.h",
@@ -75,8 +111,10 @@ objc_library(
         "SNTDeviceMessageWindowController.m",
         "SNTFileAccessMessageWindowController.h",
         "SNTFileAccessMessageWindowController.m",
-        "SNTMessageWindowController.h",
-        "SNTMessageWindowController.m",
+        # "SNTKillOnStartupWindowController.h",
+        # "SNTKillOnStartupWindowController.mm",
+        # "SNTMessageWindowController.h",
+        # "SNTMessageWindowController.m",
         "SNTNotificationManager.h",
         "SNTNotificationManager.m",
         "main.m",
@@ -92,10 +130,13 @@ objc_library(
         "UserNotifications",
     ],
     deps = [
+        ":SNTMessageWindowController",
         ":SNTAboutWindowView",
         ":SNTBinaryMessageWindowView",
         ":SNTDeviceMessageWindowView",
         ":SNTFileAccessMessageWindowView",
+        ":SNTKillOnStartupWindowView",
+        ":SNTKillOnStartupWindowController",
         "//Source/common:CertificateHelpers",
         "//Source/common:MOLCertificate",
         "//Source/common:MOLCodesignChecker",

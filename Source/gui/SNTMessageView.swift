@@ -31,44 +31,46 @@ public struct SNTMessageView<Content: View>: View {
   }
 
   public var body: some View {
-    VStack {
-      HStack {
-        let image = Image(nsImage: NSImage(named: "MessageIcon") ?? NSImage())
-          .resizable()
-          .scaledToFill()
-          .frame(width: 32, height: 32)
-          .saturation(0.9)
+    VStack(spacing: 0) {
+      VStack {
+        HStack {
+          let image = Image(nsImage: NSImage(named: "MessageIcon") ?? NSImage())
+            .resizable()
+            .scaledToFill()
+            .frame(width: 32, height: 32)
+            .saturation(0.9)
 
-        if SpecialDateIs(month: 4, day: 1) {
-          image
-          Text(verbatim: " Santa ").font(Font.custom("ComicSansMS", size: 34.0))
-          image.hidden()
-        } else if SpecialDateIs(month: 5, day: 4) {
-          // $ is the Rebel Alliance logo in the StarJedi font.
-          Text(verbatim: "$  Santa   ").font(Font.custom("StarJedi", size: 34.0))
-        } else if SpecialDateIs(month: 10, day: 31) {
-          Text(verbatim: "🎃 Santa   ").font(Font.custom("HelveticaNeue-UltraLight", size: 34.0))
-        } else {
-          image
-          Text(verbatim: " Santa ").font(Font.custom("HelveticaNeue-UltraLight", size: 34.0))
-          image.hidden()
+          if SpecialDateIs(month: 4, day: 1) {
+            image
+            Text(verbatim: " Santa ").font(Font.custom("ComicSansMS", size: 34.0))
+            image.hidden()
+          } else if SpecialDateIs(month: 5, day: 4) {
+            // $ is the Rebel Alliance logo in the StarJedi font.
+            Text(verbatim: "$  Santa   ").font(Font.custom("StarJedi", size: 34.0))
+          } else if SpecialDateIs(month: 10, day: 31) {
+            Text(verbatim: "🎃 Santa   ").font(Font.custom("HelveticaNeue-UltraLight", size: 34.0))
+          } else {
+            image
+            Text(verbatim: " Santa ").font(Font.custom("HelveticaNeue-UltraLight", size: 34.0))
+            image.hidden()
+          }
         }
+      }.fixedSize()
+
+      VStack(spacing: 10.0) {
+        AttributedText(blockMessage)
+          .multilineTextAlignment(.center)
+          .padding([.leading, .trailing], 15.0)
+          .fixedSize(horizontal: false, vertical: true)
+
+        Spacer()
+
+        content
       }
-    }.fixedSize()
-
-    VStack(spacing: 10.0) {
-      AttributedText(blockMessage)
-        .multilineTextAlignment(.center)
-        .padding([.leading, .trailing], 15.0)
-        .fixedSize(horizontal: false, vertical: true)
-
-      Spacer()
-
-      content
+      .padding([.leading, .trailing], 40.0)
+      .padding([.bottom], 10.0)
+      .frame(maxWidth: MAX_OUTER_VIEW_WIDTH)
     }
-    .padding([.leading, .trailing], 40.0)
-    .padding([.bottom], 10.0)
-    .frame(maxWidth: MAX_OUTER_VIEW_WIDTH)
   }
 }
 

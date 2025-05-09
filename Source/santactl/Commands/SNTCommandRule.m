@@ -130,6 +130,7 @@ REGISTER_COMMAND_NAME(@"rule")
   SNTRule *newRule = [[SNTRule alloc] init];
   newRule.state = SNTRuleStateUnknown;
   newRule.type = SNTRuleTypeBinary;
+  newRule.gracePeriod = -1;
 
   NSString *path;
   NSString *jsonFilePath;
@@ -190,6 +191,11 @@ REGISTER_COMMAND_NAME(@"rule")
         [self printErrorUsageAndExit:@"--comment requires an argument"];
       }
       newRule.comment = arguments[i];
+    } else if ([arg caseInsensitiveCompare:@"--kill-on-startup"] == NSOrderedSame) {
+      if (++i > arguments.count - 1) {
+        [self printErrorUsageAndExit:@"--kill-on-startup requires an argument"];
+      }
+      newRule.gracePeriod = atoi([arguments[i] UTF8String]);
 #ifdef DEBUG
     } else if ([arg caseInsensitiveCompare:@"--force"] == NSOrderedSame) {
       // Don't do anything special.

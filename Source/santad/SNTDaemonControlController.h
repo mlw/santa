@@ -16,6 +16,7 @@
 
 #include <memory>
 
+#import "Source/santad/SNTExecutionController.h"
 #import "Source/common/SNTXPCControlInterface.h"
 #include "Source/santad/DataLayer/WatchItems.h"
 #include "Source/santad/EventProviders/AuthResultCache.h"
@@ -32,6 +33,7 @@
 - (instancetype)initWithAuthResultCache:(std::shared_ptr<santa::AuthResultCache>)authResultCache
                       notificationQueue:(SNTNotificationQueue *)notQueue
                              syncdQueue:(SNTSyncdQueue *)syncdQueue
+                    executionController:(SNTExecutionController*)executionController
                                  logger:(std::shared_ptr<santa::Logger>)logger
                              watchItems:(std::shared_ptr<santa::WatchItems>)watchItems;
 @end

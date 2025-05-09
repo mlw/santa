@@ -87,6 +87,7 @@ struct RuleCounts {
 ///  GUI Ops
 ///
 - (void)setNotificationListener:(NSXPCListenerEndpoint *)listener;
+- (void)terminatePid:(pid_t)pid version:(int)pidversion reply:(void (^)(BOOL))reply;
 
 ///
 ///  Syncd Ops

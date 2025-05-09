@@ -22,6 +22,7 @@
 @class SNTDeviceEvent;
 @class SNTFileAccessEvent;
 @class SNTStoredEvent;
+@class SNTKillEvent;
 
 /// Protocol implemented by SantaGUI and utilized by santad
 @protocol SNTNotifierXPC
@@ -43,6 +44,11 @@
                    fileCount:(uint64_t)fileCount
                  hashedCount:(uint64_t)hashedCount;
 - (void)requestAPNSToken:(void (^)(NSString *))reply;
+
+- (void)postKillOnStartup:(NSArray<SNTKillEvent*>*)events
+            customMessage:(NSString *)message
+                customURL:(NSString *)url;
+- (void)postKillOnStartupKilled:(pid_t)pid;
 @end
 
 @interface SNTXPCNotifierInterface : NSObject

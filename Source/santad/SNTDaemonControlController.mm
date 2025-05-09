@@ -57,6 +57,7 @@ double watchdogRAMPeak = 0;
 @property SNTPolicyProcessor *policyProcessor;
 @property SNTNotificationQueue *notQueue;
 @property SNTSyncdQueue *syncdQueue;
+@property SNTExecutionController *executionController;
 @end
 
 @implementation SNTDaemonControlController {
@@ -68,6 +69,7 @@ double watchdogRAMPeak = 0;
 - (instancetype)initWithAuthResultCache:(std::shared_ptr<AuthResultCache>)authResultCache
                       notificationQueue:(SNTNotificationQueue *)notQueue
                              syncdQueue:(SNTSyncdQueue *)syncdQueue
+                    executionController:(SNTExecutionController*)executionController
                                  logger:(std::shared_ptr<Logger>)logger
                              watchItems:(std::shared_ptr<WatchItems>)watchItems {
   self = [super init];
@@ -79,6 +81,7 @@ double watchdogRAMPeak = 0;
     _watchItems = std::move(watchItems);
     _notQueue = notQueue;
     _syncdQueue = syncdQueue;
+    _executionController = executionController;
   }
   return self;
 }
@@ -143,7 +146,8 @@ double watchdogRAMPeak = 0;
       ((cleanupType != SNTRuleCleanupNone) || [ruleTable addedRulesShouldFlushDecisionCache:rules]);
 
   NSError *error;
-  [ruleTable addRules:rules ruleCleanup:cleanupType error:&error];
+  BOOL reevalLiveProcs = NO;
+  [ruleTable addRules:rules ruleCleanup:cleanupType reevalLiveProcesses:&reevalLiveProcs error:&error];
 
   // Whenever we add rules, we can also check for and remove outdated transitive rules.
   [ruleTable removeOutdatedTransitiveRules];
@@ -152,6 +156,10 @@ double watchdogRAMPeak = 0;
   if (flushCache) {
     LOGI(@"Flushing caches");
     self->_authResultCache->FlushCache(FlushCacheMode::kAllCaches, FlushCacheReason::kRulesChanged);
+  }
+
+  if (reevalLiveProcs) {
+    [self.executionController thisMachineKillsProcesses];
   }
 
   reply(error);
@@ -356,6 +364,13 @@ double watchdogRAMPeak = 0;
 - (void)requestAPNSToken:(void (^)(NSString *))reply {
   // Simply forward request to the active GUI (if any).
   [self.notQueue.notifierConnection.remoteObjectProxy requestAPNSToken:reply];
+}
+
+- (void)terminatePid:(pid_t)pid version:(int)pidversion reply:(void (^)(BOOL))reply {
+  LOGE(@"In daemon controller, want to terminate: %d, %d", pid, pidversion);
+  BOOL result = [self.notQueue terminatePid:pid version:pidversion];
+    LOGE(@"Back in daemon controller with result: result: %d", result);
+  reply (result);
 }
 
 #pragma mark syncd Ops

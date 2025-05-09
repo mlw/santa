@@ -24,6 +24,11 @@
  */
 
 #import <Foundation/Foundation.h>
+#include <sys/cdefs.h>
+
+#import "Source/common/MOLCodesignChecker.h"
+#import "Source/common/SNTCachedDecision.h"
+#import "Source/common/SNTCommonEnums.h"
 
 struct RuleIdentifiers {
   NSString *cdhash;
@@ -32,6 +37,9 @@ struct RuleIdentifiers {
   NSString *certificateSHA256;
   NSString *teamID;
 };
+
+struct RuleIdentifiers CreateRuleIDsWithCodesignInfo(SNTSigningStatus signingStatus, MOLCodesignChecker *csc);
+struct RuleIdentifiers CreateRuleIDsWithCachedDecision(SNTCachedDecision *cd);
 
 @interface SNTRuleIdentifiers : NSObject <NSSecureCoding>
 @property(readonly) NSString *cdhash;

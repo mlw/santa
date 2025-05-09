@@ -21,6 +21,7 @@
 #import "Source/common/SNTConfigState.h"
 
 @class SNTStoredEvent;
+@class SNTKillEvent;
 @class MOLXPCConnection;
 
 using NotificationReplyBlock = void (^)(BOOL);
@@ -40,5 +41,11 @@ using NotificationReplyBlock = void (^)(BOOL);
             customURL:(NSString *)url
           configState:(SNTConfigState *)configState
              andReply:(void (^)(BOOL authenticated))reply;
+
+- (void)notifyKillOnStartup:(NSArray<SNTKillEvent*>*)events
+              customMessage:(NSString*)customMessage
+                  customURL:(NSString*)customURL;
+
+- (BOOL)terminatePid:(pid_t)pid version:(int)pidversion;
 
 @end

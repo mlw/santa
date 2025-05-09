@@ -14,15 +14,19 @@
 /// limitations under the License.
 
 #import "Source/santad/SNTNotificationQueue.h"
+#include <_stdlib.h>
+#include <libproc.h>
 
 #import <Foundation/Foundation.h>
 
+#include "Source/common/AuditUtilities.h"
 #import "Source/common/MOLXPCConnection.h"
 #import "Source/common/RingBuffer.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTStoredEvent.h"
 #import "Source/common/SNTStrengthify.h"
 #import "Source/common/SNTXPCNotifierInterface.h"
+#include "absl/container/flat_hash_set.h"
 
 @interface SNTNotificationQueue ()
 @property dispatch_queue_t pendingQueue;
@@ -31,6 +35,7 @@
 
 @implementation SNTNotificationQueue {
   std::unique_ptr<santa::RingBuffer<NSMutableDictionary *>> _pendingNotifications;
+  std::unique_ptr<absl::flat_hash_set<std::pair<pid_t, int>>> _pendingProcessesToKill;
 }
 
 - (instancetype)initWithRingBuffer:
@@ -43,6 +48,8 @@
                                           DISPATCH_QUEUE_SERIAL);
 
     _sentToUser = [NSMutableArray array];
+
+    _pendingProcessesToKill = std::make_unique<absl::flat_hash_set<std::pair<pid_t, int>>>();
   }
   return self;
 }
@@ -157,6 +164,51 @@
                      customURL:d[@"url"]
                    configState:d[@"config"]
                       andReply:wrappedReplyBlock];
+  }
+}
+
+- (void)notifyKillOnStartup:(NSArray<SNTKillEvent*>*)events
+              customMessage:(NSString*)customMessage
+                  customURL:(NSString*)customURL {
+  if (events.count == 0) {
+    LOGD(@"Bailing because no events to send...");
+    return;
+  }
+
+  id rop = [self.notifierConnection remoteObjectProxy];
+  if (!rop) {
+    return;
+  }
+
+  // absl::flat_hash_set<std::pair<pid_t, int>> monitoredProcs;
+  for (SNTKillEvent *ke in events) {
+    if (ke.gracePeriod == 0) {
+      audit_token_t tok = santa::MakeStubAuditToken([ke.event.pid intValue],
+        [ke.event.pidversion intValue]);
+      proc_signal_with_audittoken(&tok, SIGKILL);
+    } else {
+      _pendingProcessesToKill->insert({[ke.event.pid intValue], [ke.event.pidversion intValue]});
+    }
+  }
+
+  [rop postKillOnStartup:events customMessage:customMessage customURL:customURL];
+}
+
+- (BOOL)terminatePid:(pid_t)pid version:(int)pidversion {
+  // TODO: Serialize access
+  if (arc4random_uniform(2) == 1) {
+    LOGE(@"Bail cause random 1...");
+    return NO;
+  }
+  if (_pendingProcessesToKill->erase({pid, pidversion})) {
+    audit_token_t tok = santa::MakeStubAuditToken(pid, pidversion);
+    LOGE(@"SNTNotificationQueue terminate: %d, %d", pid, pidversion);
+    // Return successfull if successfully killed or if the process is no longer running
+    return (proc_signal_with_audittoken(&tok, SIGKILL) == 0 ||
+      errno == ESRCH);
+  } else {
+    LOGE(@"SNTNotificationQueue terminate pid/pidver didn't exist: %d, %d", pid, pidversion);
+    return NO;
   }
 }
 

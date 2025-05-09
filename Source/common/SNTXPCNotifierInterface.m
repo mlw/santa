@@ -14,10 +14,19 @@
 
 #import "Source/common/SNTXPCNotifierInterface.h"
 
+#import "Source/common/SNTStoredEvent.h"
+
 @implementation SNTXPCNotifierInterface
 
 + (NSXPCInterface *)notifierInterface {
-  return [NSXPCInterface interfaceWithProtocol:@protocol(SNTNotifierXPC)];
+  NSXPCInterface *r = [NSXPCInterface interfaceWithProtocol:@protocol(SNTNotifierXPC)];
+
+  [r setClasses:[NSSet setWithObjects:[NSArray class], [SNTKillEvent class], nil]
+        forSelector:@selector(postKillOnStartup:customMessage:customURL:)
+      argumentIndex:0
+            ofReply:NO];
+
+  return r;
 }
 
 @end

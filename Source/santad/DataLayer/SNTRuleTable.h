@@ -73,6 +73,7 @@
 ///          The first matching rule found is returned.
 ///
 - (SNTRule *)ruleForIdentifiers:(struct RuleIdentifiers)identifiers;
+- (SNTRule *)killRuleForIdentifiers:(const struct RuleIdentifiers)identifiers;
 
 ///
 ///  Add an array of rules to the database. The rules will be added within a transaction and the
@@ -83,7 +84,10 @@
 ///  @param error When returning NO, will be filled with appropriate error.
 ///  @return YES if adding all rules passed, NO if any were rejected.
 ///
+- (BOOL)addRules:(NSArray *)rules ruleCleanup:(SNTRuleCleanup)cleanupType reevalLiveProcesses:(BOOL*)reevalLiveProcesses error:(NSError **)error;
 - (BOOL)addRules:(NSArray *)rules ruleCleanup:(SNTRuleCleanup)cleanupType error:(NSError **)error;
+
+// - (void)thisMachineKillsProcesses;
 
 ///
 ///  Checks the given array of rules to see if adding any of them to the rules database would

@@ -16,8 +16,14 @@
 #include "Source/santad/Santad.h"
 
 #include <cstdlib>
+#include <libproc.h>
 #include <memory>
 
+#import "Source/common/CertificateHelpers.h"
+#import "Source/common/SNTFileInfo.h"
+#import "Source/common/MOLCodesignChecker.h"
+#import "Source/common/SNTRuleIdentifiers.h"
+#include "Source/common/SystemResources.h"
 #include "Source/common/PrefixTree.h"
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigurator.h"
@@ -40,6 +46,8 @@
 #import "Source/santad/EventProviders/SNTEndpointSecurityRecorder.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityTamperResistance.h"
 #include "Source/santad/Logs/EndpointSecurity/Logger.h"
+#import "Source/santad/SNTDatabaseController.h"
+#import "Source/santad/DataLayer/SNTRuleTable.h"
 #include "Source/santad/SNTDaemonControlController.h"
 #include "Source/santad/SNTDecisionCache.h"
 #include "Source/santad/TTYWriter.h"
@@ -72,6 +80,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
       [[SNTDaemonControlController alloc] initWithAuthResultCache:auth_result_cache
                                                 notificationQueue:notifier_queue
                                                        syncdQueue:syncd_queue
+                                              executionController:exec_controller
                                                            logger:logger
                                                        watchItems:watch_items];
 
@@ -571,6 +580,9 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
   }
   [monitor_client enable];
   [device_client enable];
+
+  // [[SNTDatabaseController ruleTable] thisMachineKillsProcesses];
+  [exec_controller thisMachineKillsProcesses];
 
   [[NSRunLoop mainRunLoop] run];
 }

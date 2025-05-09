@@ -13,6 +13,7 @@
 ///    limitations under the License.
 
 #import <Foundation/Foundation.h>
+#include <objc/NSObjCRuntime.h>
 
 #import "Source/common/SNTCommonEnums.h"
 
@@ -57,6 +58,8 @@
 ///
 @property(copy) NSString *comment;
 
+@property NSInteger gracePeriod;
+
 ///
 ///  Designated initializer.
 ///
@@ -67,6 +70,7 @@
                          customURL:(NSString *)customURL
                          timestamp:(NSUInteger)timestamp
                            comment:(NSString *)comment
+                       gracePeriod:(NSInteger)gracePeriod
                              error:(NSError **)error;
 
 ///

@@ -18,6 +18,36 @@
 #import "Source/common/CertificateHelpers.h"
 #import "Source/common/CoderMacros.h"
 #import "Source/common/MOLCertificate.h"
+#import "Source/common/SNTLogging.h"
+
+@implementation SNTKillEvent
++ (BOOL)supportsSecureCoding {
+  return YES;
+}
+
+- (void)encodeWithCoder:(NSCoder *)coder {
+  ENCODE_BOXABLE(coder, gracePeriod);
+  ENCODE(coder, event);
+}
+
+- (instancetype)initWithCoder:(NSCoder *)decoder {
+  self = [super init];
+  if (self) {
+    DECODE_SELECTOR(decoder, gracePeriod, NSNumber, integerValue);
+    DECODE(decoder, event, SNTStoredEvent);
+  }
+  return self;
+}
+
+- (id)copyWithZone:(NSZone *)zone {
+  LOGE(@"KE Copy with zone...");
+  SNTKillEvent *copy = [[[self class] allocWithZone:zone] init];
+  copy.gracePeriod = self.gracePeriod;
+  copy.event = [self.event copyWithZone:zone];
+  return copy;
+}
+
+@end
 
 @implementation SNTStoredEvent
 
@@ -54,6 +84,7 @@
   ENCODE(coder, occurrenceDate);
   ENCODE_BOXABLE(coder, decision);
   ENCODE(coder, pid);
+  ENCODE(coder, pidversion);
   ENCODE(coder, ppid);
   ENCODE(coder, parentName);
 
@@ -105,6 +136,7 @@
     DECODE(decoder, occurrenceDate, NSDate);
     DECODE_SELECTOR(decoder, decision, NSNumber, unsignedLongLongValue);
     DECODE(decoder, pid, NSNumber);
+    DECODE(decoder, pidversion, NSNumber);
     DECODE(decoder, ppid, NSNumber);
     DECODE(decoder, parentName, NSString);
 
@@ -146,6 +178,55 @@
 
 - (NSArray *)signingChainCertRefs {
   return CertificateChain(self.signingChain);
+}
+
+- (id)copyWithZone:(NSZone *)zone {
+  LOGE(@"StoredEvent Copy with zone...");
+  SNTStoredEvent *copy = [[[self class] allocWithZone:zone] init];
+
+  copy.idx = @(arc4random());
+  copy.fileSHA256 = [self.fileSHA256 copyWithZone:zone];
+
+  copy.filePath = [self.filePath copyWithZone:zone];
+  copy.needsBundleHash = self.needsBundleHash;
+  copy.fileBundleHash = [self.fileBundleHash copyWithZone:zone];
+  copy.fileBundleHashMilliseconds = [self.fileBundleHashMilliseconds copyWithZone:zone];
+  copy.fileBundleBinaryCount = [self.fileBundleBinaryCount copyWithZone:zone];
+  copy.fileBundleName = [self.fileBundleName copyWithZone:zone];
+  copy.fileBundlePath = [self.fileBundlePath copyWithZone:zone];
+  copy.fileBundleExecutableRelPath = [self.fileBundleExecutableRelPath copyWithZone:zone];
+  copy.fileBundleID = [self.fileBundleID copyWithZone:zone];
+  copy.fileBundleVersion = [self.fileBundleVersion copyWithZone:zone];
+  copy.fileBundleVersionString = [self.fileBundleVersionString copyWithZone:zone];
+  LOGE(@"Copy with zone: signing chain");
+  copy.signingChain = [self.signingChain sntDeepCopy];
+  copy.teamID = [self.teamID copyWithZone:zone];
+  copy.signingID = [self.signingID copyWithZone:zone];
+  copy.cdhash = [self.cdhash copyWithZone:zone];
+  copy.codesigningFlags = self.codesigningFlags;
+  copy.signingStatus = self.signingStatus;
+  copy.executingUser = [self.executingUser copyWithZone:zone];
+  copy.occurrenceDate = [self.occurrenceDate copyWithZone:zone];
+  copy.decision = self.decision;
+  LOGE(@"Copy with zone: logged in users");
+  copy.loggedInUsers = [self.loggedInUsers sntDeepCopy];
+    LOGE(@"Copy with zone: current sessions");
+  copy.currentSessions = [self.currentSessions sntDeepCopy];
+  copy.pid = [self.pid copyWithZone:zone];
+  copy.pidversion = [self.pidversion copyWithZone:zone];
+  copy.ppid = [self.ppid copyWithZone:zone];
+  copy.parentName = [self.parentName copyWithZone:zone];
+  copy.quarantineDataURL = [self.quarantineDataURL copyWithZone:zone];
+  copy.quarantineRefererURL = [self.quarantineRefererURL copyWithZone:zone];
+  copy.quarantineTimestamp = [self.quarantineTimestamp copyWithZone:zone];
+  copy.quarantineAgentBundleID = [self.quarantineAgentBundleID copyWithZone:zone];
+  // copy.publisherInfo = [self.publisherInfo copyWithZone:zone];
+  // copy.signingChainCertRefs = [self.signingChainCertRefs copyWithZone:zone];
+  LOGE(@"Copy with zone: entitlements");
+  copy.entitlements = [self.entitlements sntDeepCopy];
+  copy.entitlementsFiltered = self.entitlementsFiltered;
+
+  return copy;
 }
 
 @end

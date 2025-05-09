@@ -16,13 +16,21 @@
 #import <Foundation/Foundation.h>
 
 #import "Source/common/SNTCommonEnums.h"
+#import "Source/common/SNTDeepCopy.h"
 
 @class MOLCertificate;
+
+@class SNTStoredEvent;
+
+@interface SNTKillEvent : NSObject <NSSecureCoding, NSCopying>
+@property NSInteger gracePeriod;
+@property SNTStoredEvent *event;
+@end
 
 ///
 ///  Represents an event stored in the database.
 ///
-@interface SNTStoredEvent : NSObject <NSSecureCoding>
+@interface SNTStoredEvent : NSObject <NSSecureCoding, NSCopying>
 
 ///
 ///  An index for this event, randomly generated during initialization.
@@ -152,6 +160,11 @@
 ///  The process ID of the binary being executed.
 ///
 @property NSNumber *pid;
+
+///
+///  The process ID version of the binary being executed.
+///
+@property NSNumber *pidversion;
 
 ///
 ///  The parent process ID of the binary being executed.

@@ -20,7 +20,7 @@ objc_library(
 
 objc_library(
     name = "SNTRuleTable",
-    srcs = ["DataLayer/SNTRuleTable.m"],
+    srcs = ["DataLayer/SNTRuleTable.mm"],
     hdrs = ["DataLayer/SNTRuleTable.h"],
     sdk_dylibs = [
         "EndpointSecurity",
@@ -39,6 +39,7 @@ objc_library(
         "//Source/common:SNTLogging",
         "//Source/common:SNTRule",
         "//Source/common:SNTRuleIdentifiers",
+        "//Source/common:SystemResources",
         "//Source/common:SigningIDHelpers",
     ],
 )
@@ -194,6 +195,7 @@ objc_library(
     srcs = ["SNTNotificationQueue.mm"],
     hdrs = ["SNTNotificationQueue.h"],
     deps = [
+        "//Source/common:AuditUtilities",
         "//Source/common:MOLXPCConnection",
         "//Source/common:RingBuffer",
         "//Source/common:SNTConfigState",
@@ -201,6 +203,7 @@ objc_library(
         "//Source/common:SNTStoredEvent",
         "//Source/common:SNTStrengthify",
         "//Source/common:SNTXPCNotifierInterface",
+        "@com_google_absl//absl/container:flat_hash_set",
     ],
 )
 
@@ -263,6 +266,7 @@ objc_library(
         "//Source/common:SNTLogging",
         "//Source/common:SNTRule",
         "//Source/common:SNTRuleIdentifiers",
+        "//Source/common:SystemResources",
         "//Source/common:SigningIDHelpers",
         "@FMDB",
         "@com_google_absl//absl/container:flat_hash_map",
@@ -829,6 +833,7 @@ objc_library(
     deps = [
         ":AuthResultCache",
         ":EndpointSecurityLogger",
+        ":SNTExecutionController",
         ":SNTDatabaseController",
         ":SNTEventTable",
         ":SNTNotificationQueue",
@@ -897,6 +902,10 @@ objc_library(
         ":TTYWriter",
         ":WatchItemPolicy",
         ":WatchItems",
+        "//Source/common:CertificateHelpers",
+        "//Source/common:MOLCodesignChecker",
+        "//Source/common:SNTFileInfo",
+        "//Source/common:SNTRuleIdentifiers",
         "//Source/common:MOLXPCConnection",
         "//Source/common:PrefixTree",
         "//Source/common:SNTCommonEnums",
@@ -1086,7 +1095,7 @@ santa_unit_test(
         "DataLayer/SNTDatabaseTable.h",
         "DataLayer/SNTDatabaseTable.m",
         "DataLayer/SNTRuleTable.h",
-        "DataLayer/SNTRuleTable.m",
+        "DataLayer/SNTRuleTable.mm",
         "DataLayer/SNTRuleTableTest.m",
     ],
     sdk_dylibs = [
@@ -1105,6 +1114,7 @@ santa_unit_test(
         "//Source/common:SNTRule",
         "//Source/common:SNTRuleIdentifiers",
         "//Source/common:SigningIDHelpers",
+        "//Source/common:SystemResources",
         "@FMDB",
         "@OCMock",
     ],

@@ -16,7 +16,9 @@
 #import "Source/santad/DataLayer/SNTRuleTable.h"
 
 #import <EndpointSecurity/EndpointSecurity.h>
+#include <libproc.h>
 
+#include "Source/common/SystemResources.h"
 #import "Source/common/CertificateHelpers.h"
 #import "Source/common/MOLCertificate.h"
 #import "Source/common/MOLCodesignChecker.h"
@@ -30,7 +32,7 @@
 #import "Source/common/SNTRule.h"
 #import "Source/common/SigningIDHelpers.h"
 
-static const uint32_t kRuleTableCurrentVersion = 8;
+static const uint32_t kRuleTableCurrentVersion = 9;
 
 // TODO(nguyenphillip): this should be configurable.
 // How many rules must be in database before we start trying to remove transitive rules.
@@ -263,6 +265,11 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
     newVersion = 8;
   }
 
+  if (version < 9) {
+    [db executeUpdate:@"ALTER TABLE 'rules' ADD 'graceperiod' INTEGER"];
+    newVersion = 9;
+  }
+
   // Save signing info for launchd and santad. Used to ensure they are always allowed.
   self.santadCSInfo = [[MOLCodesignChecker alloc] initWithSelf];
   self.launchdCSInfo = [[MOLCodesignChecker alloc] initWithPID:1];
@@ -331,12 +338,13 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
 
 - (SNTRule *)ruleFromResultSet:(FMResultSet *)rs {
   return [[SNTRule alloc] initWithIdentifier:[rs stringForColumn:@"identifier"]
-                                       state:[rs intForColumn:@"state"]
-                                        type:[rs intForColumn:@"type"]
+                                       state:(SNTRuleState)[rs intForColumn:@"state"]
+                                        type:(SNTRuleType)[rs intForColumn:@"type"]
                                    customMsg:[rs stringForColumn:@"custommsg"]
                                    customURL:[rs stringForColumn:@"customurl"]
                                    timestamp:[rs intForColumn:@"timestamp"]
                                      comment:[rs stringForColumn:@"comment"]
+                                   gracePeriod:([rs columnIsNull:@"graceperiod"] ? -1 : [rs intForColumn:@"graceperiod"])
                                        error:nil];
 }
 
@@ -420,9 +428,60 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
   return rule;
 }
 
+- (SNTRule *)killRuleForIdentifiers:(const struct RuleIdentifiers)identifiers {
+  __block SNTRule *rule;
+
+  // Look for a static rule that matches.
+  NSDictionary *staticRules = [[SNTConfigurator configurator] staticRules];
+  if (staticRules.count) {
+    // IMPORTANT: The order static rules are checked here should be the same
+    // order as given by the SQL query for the rules database.
+    rule = staticRules[identifiers.cdhash];
+    if (rule.type == SNTRuleTypeCDHash) {
+      return rule;
+    }
+
+    rule = staticRules[identifiers.signingID];
+    if (rule.type == SNTRuleTypeSigningID) {
+      return rule;
+    }
+
+    rule = staticRules[identifiers.certificateSHA256];
+    if (rule.type == SNTRuleTypeCertificate) {
+      return rule;
+    }
+
+    rule = staticRules[identifiers.teamID];
+    if (rule.type == SNTRuleTypeTeamID) {
+      return rule;
+    }
+  }
+
+  [self inDatabase:^(FMDatabase *db) {
+    FMResultSet *rs =
+        [db executeQuery:@"SELECT * FROM rules WHERE "
+                         @"   (identifier=? AND type=500) "
+                         @"OR (identifier=? AND type=2000) "
+                         @"OR (identifier=? AND type=3000) "
+                         @"OR (identifier=? AND type=4000) LIMIT 1",
+                         identifiers.cdhash, identifiers.signingID,
+                         identifiers.certificateSHA256, identifiers.teamID];
+    if ([rs next]) {
+      rule = [self ruleFromResultSet:rs];
+    }
+    [rs close];
+  }];
+
+  return rule;
+}
+
 #pragma mark Adding
 
 - (BOOL)addRules:(NSArray *)rules ruleCleanup:(SNTRuleCleanup)cleanupType error:(NSError **)error {
+  return [self addRules:rules ruleCleanup:cleanupType reevalLiveProcesses:NULL error:error];
+}
+
+- (BOOL)addRules:(NSArray *)rules ruleCleanup:(SNTRuleCleanup)cleanupType reevalLiveProcesses:(BOOL*)reevalLiveProcesses error:(NSError **)error {
   // Only accept an empty rules array if the cleanup-type is not none.
   if ((!rules || rules.count < 1) && cleanupType == SNTRuleCleanupNone) {
     [SNTError populateError:error withCode:SNTErrorCodeEmptyRuleArray format:@"Empty rule array"];
@@ -430,7 +489,10 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
   }
 
   __block BOOL failed = NO;
+  __block BOOL shouldReevalLiveProcs = NO;
   __block NSError *blockErr;
+
+  LOGE(@"Add rules: %@", rules[0]);
 
   [self inTransaction:^(FMDatabase *db, BOOL *rollback) {
     if (cleanupType == SNTRuleCleanupAll) {
@@ -461,12 +523,13 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
           return;
         }
       } else {
+        shouldReevalLiveProcs = (rule.gracePeriod >= 0);
         if (![db executeUpdate:
                      @"INSERT OR REPLACE INTO rules "
-                     @"(identifier, state, type, custommsg, customurl, timestamp, comment) "
-                     @"VALUES (?, ?, ?, ?, ?, ?, ?);",
+                     @"(identifier, state, type, custommsg, customurl, timestamp, comment, graceperiod) "
+                     @"VALUES (?, ?, ?, ?, ?, ?, ?, ?);",
                      rule.identifier, @(rule.state), @(rule.type), rule.customMsg, rule.customURL,
-                     @(rule.timestamp), rule.comment]) {
+                     @(rule.timestamp), rule.comment, @(rule.gracePeriod)]) {
           [SNTError populateError:&blockErr
                          withCode:SNTErrorCodeInsertOrReplaceRuleFailed
                           message:@"A database error occurred while inserting/replacing a rule"
@@ -480,6 +543,10 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
 
   if (blockErr && error) {
     *error = blockErr;
+  }
+
+  if (!failed && reevalLiveProcesses) {
+    *reevalLiveProcesses = shouldReevalLiveProcs;
   }
 
   return !failed;

@@ -431,10 +431,14 @@ santa_unit_test(
 
 objc_library(
     name = "SNTRuleIdentifiers",
-    srcs = ["SNTRuleIdentifiers.m"],
+    srcs = ["SNTRuleIdentifiers.mm"],
     hdrs = ["SNTRuleIdentifiers.h"],
     deps = [
         ":CoderMacros",
+        ":SNTCommonEnums",
+        ":SNTCachedDecision",
+        ":MOLCodesignChecker",
+        ":MOLCertificate",
     ],
 )
 
@@ -450,9 +454,11 @@ objc_library(
     module_name = "santa_common_SNTStoredEvent",
     deps = [
         ":CertificateHelpers",
+        ":SNTLogging",
         ":CoderMacros",
         ":MOLCertificate",
         ":SNTCommonEnums",
+        ":SNTDeepCopy",
     ],
 )
 

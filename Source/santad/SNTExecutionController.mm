@@ -14,6 +14,7 @@
 /// limitations under the License.
 
 #import "Source/santad/SNTExecutionController.h"
+#include <sys/stat.h>
 
 #import <Foundation/Foundation.h>
 
@@ -23,12 +24,16 @@
 #include <pwd.h>
 #include <sys/param.h>
 #include <utmpx.h>
+#include <signal.h>
 
 #include <memory>
 #include <set>
 #include <string>
 #include <utility>
 
+#include "Source/common/SNTRuleIdentifiers.h"
+#import "Source/common/CertificateHelpers.h"
+#include "Source/common/SystemResources.h"
 #include "Source/common/BranchPrediction.h"
 #import "Source/common/MOLCodesignChecker.h"
 #include "Source/common/PrefixTree.h"
@@ -55,6 +60,7 @@
 #import "Source/santad/SNTPolicyProcessor.h"
 #import "Source/santad/SNTSyncdQueue.h"
 #include "absl/synchronization/mutex.h"
+#include "absl/container/flat_hash_map.h"
 
 using santa::Message;
 using santa::PrefixTree;
@@ -89,6 +95,7 @@ void UpdatePrefixFilterLocked(std::unique_ptr<PrefixTree<Unit>> &tree,
 @property SNTSyncdQueue *syncdQueue;
 @property SNTMetricCounter *events;
 @property santa::ProcessControlBlock processControlBlock;
+@property SNTConfigurator *configurator;
 
 @property dispatch_queue_t eventQueue;
 @end
@@ -129,6 +136,8 @@ static NSString *const kPrinterProxyPostMonterey =
     _policyProcessor = [[SNTPolicyProcessor alloc] initWithRuleTable:_ruleTable];
     _procSignalCache = std::make_unique<SantaCache<std::pair<pid_t, int>, bool>>(100000);
     _processControlBlock = processControlBlock;
+
+    _configurator = [SNTConfigurator configurator];
 
     _eventQueue =
         dispatch_queue_create("com.northpolesec.santa.daemon.event_upload", DISPATCH_QUEUE_SERIAL);
@@ -610,6 +619,7 @@ static NSString *const kPrinterProxyPostMonterey =
                                                customURL:nil
                                                timestamp:[[NSDate now] timeIntervalSince1970]
                                                  comment:commentStr
+                                                 gracePeriod:-1
                                                    error:&err];
   if (err) {
     LOGE(@"Failed to add rule in standalone mode for %@: %@", se.filePath,
@@ -624,6 +634,140 @@ static NSString *const kPrinterProxyPostMonterey =
   }
 
   // TODO: Notify the sync service of the new rule.
+}
+
+- (void)thisMachineKillsProcesses {
+  //
+  // TODO: Check if configured to do this
+  //
+  std::optional<std::vector<pid_t>> pids = GetPidList();
+  if (!pids.has_value()) {
+    LOGW(@"Unable to get list of pids");
+    return;
+  }
+
+  absl::flat_hash_map<SantaVnode, SNTKillEvent*> seenPaths;
+
+  task_name_t task;
+  mach_msg_type_number_t size = TASK_AUDIT_TOKEN_COUNT;
+  audit_token_t token;
+
+  int counter = 0;
+  int reused = 0;
+
+  LOGE(@"Evaluating pids to kill: %zu", (*pids).size());
+  NSMutableArray<SNTKillEvent*> *killEvents = [[NSMutableArray alloc] init];
+  for (const pid_t pid : *pids) {
+    counter++;
+    if (counter && (counter % 50 == 0)) {
+      LOGE(@"Processed procs: %d, reused: %d", counter, reused);
+    }
+    if (pid == 0 || pid == 1 || pid == getpid()) {
+      continue;
+    }
+
+    if (task_name_for_pid(mach_task_self(), pid, &task) != KERN_SUCCESS) {
+      // LOGD(@"Unable to get task_name_for_pid: %d", pid);
+      continue;
+    }
+
+    if (task_info(task, TASK_AUDIT_TOKEN, (task_info_t)&token, &size) != KERN_SUCCESS) {
+      LOGD(@"Failed to get task info for pid: %d", pid);
+      continue;
+    }
+
+    mach_port_deallocate(mach_task_self(), task);
+
+    char path[PROC_PIDPATHINFO_MAXSIZE];
+    if (proc_pidpath_audittoken(&token, path, sizeof(path)) <= 0) {
+      LOGD(@"Failed to get path for pid: %d", pid);
+      continue;
+    }
+
+    SNTKillEvent *killEvent;
+    NSString *resolvedPath = [[@(path) stringByResolvingSymlinksInPath] stringByStandardizingPath];
+
+    struct stat sb;
+    auto it = stat(resolvedPath.UTF8String, &sb) == 0 ? seenPaths.find(SantaVnode::VnodeForFile(sb)) : seenPaths.end();
+
+    if (it != seenPaths.end()) {
+      // LOGE(@" REUSE: %u, %llu - %@", fileInfo.vnode.fsid, fileInfo.vnode.fileid, @(path));
+      // LOGE(@" REUSE: %@", @(path));
+      killEvent = [it->second copy];
+      killEvent.event.pid = @(audit_token_to_pid(token));
+      killEvent.event.pidversion = @(audit_token_to_pidversion(token));
+      reused++;
+    } else {
+      SNTFileInfo *fileInfo = [[SNTFileInfo alloc] initWithResolvedPath:resolvedPath error:nil];
+      // LOGE(@"REEVAL: %u, %llu - %@", fileInfo.vnode.fsid, fileInfo.vnode.fileid, @(path));
+      NSError *error;
+      MOLCodesignChecker *csc = [fileInfo codesignCheckerWithError:&error];
+      SNTSigningStatus signingStatus;
+      if (csc) {
+        if (csc.signatureFlags & kSecCodeSignatureAdhoc) {
+          signingStatus = SNTSigningStatusAdhoc;
+        } else if (IsDevelopmentCert(csc.leafCertificate)) {
+          signingStatus = SNTSigningStatusDevelopment;
+        } else {
+          signingStatus = SNTSigningStatusProduction;
+        }
+      } else {
+        if (error.code == errSecCSUnsigned) {
+          signingStatus = SNTSigningStatusUnsigned;
+        } else {
+          signingStatus = SNTSigningStatusInvalid;
+        }
+      }
+
+      RuleIdentifiers ruleIDs = CreateRuleIDsWithCodesignInfo(signingStatus, csc);
+      SNTRule *rule = [self.ruleTable killRuleForIdentifiers:ruleIDs];
+      if (rule.state == SNTRuleStateBlock || rule.state == SNTRuleStateSilentBlock) {
+        SNTStoredEvent *se = [[SNTStoredEvent alloc] init];
+        se.occurrenceDate = [[NSDate alloc] init];
+        se.cdhash = ruleIDs.cdhash;
+        se.signingID = ruleIDs.signingID;
+        se.signingStatus = signingStatus;
+        se.pid = @(audit_token_to_pid(token));
+        se.pidversion = @(audit_token_to_pidversion(token));
+        se.signingChain = csc.certificates;
+        se.filePath = fileInfo.path;
+        se.decision = [self.policyProcessor decisionForRule:rule
+                                        withTransitiveRules:[self.configurator enableTransitiveRules]];
+        se.fileBundleID = [fileInfo bundleIdentifier];
+        se.fileBundleName = [fileInfo bundleName];
+        se.fileBundlePath = [fileInfo bundlePath];
+        se.fileBundleVersionString = [fileInfo bundleShortVersionString];
+        se.fileBundleVersion = [fileInfo bundleVersion];
+        struct passwd *user = getpwuid(audit_token_to_ruid(token));
+        if (user) se.executingUser = @(user->pw_name);
+        NSArray *loggedInUsers, *currentSessions;
+        [self loggedInUsers:&loggedInUsers sessions:&currentSessions];
+        se.currentSessions = currentSessions;
+        se.loggedInUsers = loggedInUsers;
+
+        killEvent = [[SNTKillEvent alloc] init];
+        killEvent.gracePeriod = rule.gracePeriod;
+        killEvent.event = se;
+      }
+
+      seenPaths.insert({fileInfo.vnode, killEvent});
+    }
+
+    if (killEvent) {
+      LOGE(@"About to add the kill event for %@, grace: %ld", killEvent.event.signingID, killEvent.gracePeriod);
+      [killEvents addObject:killEvent];
+
+      if (killEvent.gracePeriod == 0) {
+        LOGE(@"KILLING: pid: %d, sid: %@", pid, killEvent.event.signingID);
+        // proc_signal_with_audittoken(&token, SIGKILL);
+      }
+    }
+  }
+
+  LOGE(@"Processed events: %d (reused: %d). Got events to kill on startup: %ld", counter, reused, killEvents.count);
+  [self.notifierQueue notifyKillOnStartup:killEvents customMessage:@"These running applications are not allowed by policy and they will be terminated." customURL:[self.configurator eventDetailURL]];
+
+  LOGE(@"Done evaluating PIDs to kill...");
 }
 
 @end
