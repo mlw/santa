@@ -15,9 +15,12 @@
 
 #include "Source/santad/SantadDeps.h"
 
+#include <Security/SecKeychain.h>
+
 #include <cstdlib>
 #include <memory>
 
+#include "Source/common/Keychain.h"
 #include "Source/common/RingBuffer.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTMetricSet.h"
@@ -125,13 +128,18 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator *configurator,
     exit(EXIT_FAILURE);
   }
 
+  auto keychain_manager = santa::keychain::Manager::Create(@"com.northpolesec.santa.daemon", kSecPreferencesDomainSystem);
+
   size_t spool_file_threshold_bytes = [configurator spoolDirectoryFileSizeThresholdKB] * 1024;
   size_t spool_dir_threshold_bytes = [configurator spoolDirectorySizeThresholdMB] * 1024 * 1024;
   uint64_t spool_flush_timeout_ms = [configurator spoolDirectoryEventMaxFlushTimeSec] * 1000;
   uint32_t telemetry_export_frequency_secs = [configurator telemetryExportIntervalSec];
 
+  santa::keychain::Manager* keychain_manager_ptr = keychain_manager.get();
   std::unique_ptr<::Logger> logger = Logger::Create(
-      esapi, syncd_queue,
+      esapi, syncd_queue, ^std::unique_ptr<santa::keychain::Item>(NSString *account, NSString *description) {
+        return keychain_manager_ptr->CreateItem(account, description);
+      },
       TelemetryConfigToBitmask([configurator telemetry], [configurator enableAllEventUpload]),
       [configurator eventLogType], [SNTDecisionCache sharedCache], [configurator eventLogPath],
       [configurator spoolDirectory], spool_dir_threshold_bytes, spool_file_threshold_bytes,

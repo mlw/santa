@@ -388,6 +388,7 @@ objc_library(
     deps = [
         ":CoderMacros",
         ":SNTCommonEnums",
+        ":SNTLogging",
     ],
 )
 

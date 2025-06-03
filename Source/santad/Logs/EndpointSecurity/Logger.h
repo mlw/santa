@@ -21,6 +21,7 @@
 #include <memory>
 #include <string_view>
 
+#include "Source/common/Keychain.h"
 #import "Source/common/SNTCommonEnums.h"
 #include "Source/common/TelemetryEventMap.h"
 #include "Source/common/Timer.h"
@@ -32,6 +33,7 @@
 #import "Source/santad/SNTDecisionCache.h"
 
 // Forward declarations
+@class SNTExportConfiguration;
 @class SNTStoredEvent;
 @class SNTSyncdQueue;
 namespace santa {
@@ -43,7 +45,8 @@ namespace santa {
 class Logger : public Timer<Logger> {
  public:
   static std::unique_ptr<Logger> Create(std::shared_ptr<santa::EndpointSecurityAPI> esapi,
-                                        SNTSyncdQueue *syncd_queue, TelemetryEvent telemetry_mask,
+                                        SNTSyncdQueue *syncd_queue, std::unique_ptr<santa::keychain::Item>(^CreateKeychainItemBlock)(NSString *account, NSString *description),
+                                        TelemetryEvent telemetry_mask,
                                         SNTEventLogType log_type, SNTDecisionCache *decision_cache,
                                         NSString *event_log_path, NSString *spool_log_path,
                                         size_t spool_dir_size_threshold,
@@ -51,8 +54,9 @@ class Logger : public Timer<Logger> {
                                         uint64_t spool_flush_timeout_ms,
                                         uint32_t telemetry_export_seconds);
 
-  Logger(SNTSyncdQueue *syncd_queue, TelemetryEvent telemetry_mask,
-         std::shared_ptr<santa::Serializer> serializer, std::shared_ptr<santa::Writer> writer);
+  Logger(SNTSyncdQueue *syncd_queue, std::unique_ptr<santa::keychain::Item> keychain, TelemetryEvent telemetry_mask,
+         std::shared_ptr<santa::Serializer> serializer,
+         std::shared_ptr<santa::Writer> writer);
 
   virtual ~Logger() = default;
 
@@ -83,16 +87,22 @@ class Logger : public Timer<Logger> {
   /// Export existing telemetry files.
   void ExportTelemetry();
 
+  void SetExportConfiguration(SNTExportConfiguration *exportConfig);
+
   friend class santa::LoggerPeer;
 
  private:
   void ExportTelemetrySerialized();
+  SNTExportConfiguration *GetExportConfiguration();
 
   SNTSyncdQueue *syncd_queue_;
   TelemetryEvent telemetry_mask_;
+  std::unique_ptr<santa::keychain::Item> keychain_;
   std::shared_ptr<santa::Serializer> serializer_;
   std::shared_ptr<santa::Writer> writer_;
   dispatch_queue_t export_queue_;
+  dispatch_queue_t export_config_queue_;
+  SNTExportConfiguration *export_config_;
 };
 
 }  // namespace santa
