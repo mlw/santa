@@ -26,6 +26,12 @@ NSString *FormatSigningID(MOLCodesignChecker *csc) {
     if (csc.platformBinary) {
       return [NSString stringWithFormat:@"%@:%@", @"platform", csc.signingID];
     } else {
+      NSString *fmt = @"test %d";
+      (void)fmt;
+      CLOGD("unable to format signing ID missing team ID for non-platform binary");
+      // CLOGD(fmt);
+      // LOGD(fmt, 42);
+      LOGD(@"unable to format signing ID missing team ID for non-platform binary");
       LOGD(@"unable to format signing ID missing team ID for non-platform binary: %@",
            csc.signingID);
       return nil;

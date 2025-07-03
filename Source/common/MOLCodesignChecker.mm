@@ -96,7 +96,8 @@ static NSString *const kErrorDomain = @"com.google.molcodesignchecker";
     });
 
     // For static code checks, if it was valid, perform additional checks
-    if (CFGetTypeID(codeRef) == SecStaticCodeGetTypeID() && !scopedError) {
+    // if (CFGetTypeID(codeRef) == SecStaticCodeGetTypeID() && !scopedError) {
+    if (CFGetTypeID(codeRef) == SecStaticCodeGetTypeID()) {
       // Ensure signing is consistent for all architectures.
       // Any issues found here take precedence over already found issues.
       if (!_binaryPath) _binaryPath = [self binaryPathForCodeRef:self.codeRef];
@@ -113,7 +114,9 @@ static NSString *const kErrorDomain = @"com.google.molcodesignchecker";
 
     // Do not set _signingInformation or _certificates for universal binaries with signing issues.
     NSError *err = scopedError.BridgeRelease<NSError *>();
+    NSLog(@"~~~~~ err domain: %@, status: %d", err.domain, status);
     if (!([err.domain isEqualToString:kErrorDomain] && status == errSecCSSignatureInvalid)) {
+      NSLog(@"~~~~~ Get CFDictionary of signing information for binary");
       // Get CFDictionary of signing information for binary
       CFDictionaryRef signingDict = NULL;
       SecCodeCopySigningInformation(codeRef, kSecCSSigningInformation, &signingDict);
@@ -122,6 +125,8 @@ static NSString *const kErrorDomain = @"com.google.molcodesignchecker";
       // Get array of certificates.
       NSArray *certs = _signingInformation[(__bridge id)kSecCodeInfoCertificates];
       _certificates = [MOLCertificate certificatesFromArray:certs];
+    } else {
+      NSLog(@"~~~~~ SKIPSKIP Get CFDictionary of signing information for binary");
     }
     if (status != errSecSuccess)
       if (error) *error = err;
@@ -393,7 +398,7 @@ static NSString *const kErrorDomain = @"com.google.molcodesignchecker";
 }
 
 - (NSDictionary *)architectureAndOffsetsForFileDescriptor:(int)fd {
-  size_t len = sizeof(struct fat_header);
+  ssize_t len = sizeof(struct fat_header);
   const uint8 *headerBytes = (const uint8 *)alloca(len);
   lseek(fd, 0, SEEK_SET);
   if (read(fd, (void *)headerBytes, len) != len) return nil;

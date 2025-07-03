@@ -25,10 +25,14 @@ __BEGIN_DECLS
 #define SNT_LOG_WITH_TYPE(type, fmt, ...)              \
   os_log_with_type(OS_LOG_DEFAULT, type, "%{public}s", \
                    [[NSString stringWithFormat:fmt, ##__VA_ARGS__] UTF8String])
+#define SNT_CLOG_WITH_TYPE(type, fmt, ...) os_log_with_type(OS_LOG_DEFAULT, type, fmt, ##__VA_ARGS__)
+ // #define LOGD(logFormat, ...) SNT_LOG_WITH_TYPE(OS_LOG_TYPE_DEBUG, logFormat,
+// ##__VA_ARGS__)
 
 #define SNT_PRINT_LOG(file, fmt, ...) \
   fprintf(file, "%s\n", [[NSString stringWithFormat:fmt, ##__VA_ARGS__] UTF8String]);
 
+#define CLOGD(logFormat, ...) SNT_CLOG_WITH_TYPE(OS_LOG_TYPE_DEBUG, logFormat, ##__VA_ARGS__)
 #define LOGD(logFormat, ...) SNT_LOG_WITH_TYPE(OS_LOG_TYPE_DEBUG, logFormat, ##__VA_ARGS__)
 #define LOGI(logFormat, ...) SNT_LOG_WITH_TYPE(OS_LOG_TYPE_INFO, logFormat, ##__VA_ARGS__)
 #define LOGW(logFormat, ...) SNT_LOG_WITH_TYPE(OS_LOG_TYPE_DEFAULT, logFormat, ##__VA_ARGS__)
