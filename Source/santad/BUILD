@@ -15,9 +15,13 @@ rust_library(
     srcs = glob(["rust/*.rs"]),
     edition = "2024",
     proc_macro_deps = [
-        "@northpolesec_rednose//rednose/lib/rednose_macro:rednose_macro",
+        # "@northpolesec_rednose//rednose/lib/rednose_macro:rednose_macro",
+        "@northpolesec_santa_crate_index//:rednose_macro",
     ] + all_crate_deps(proc_macro = True),
     deps = [
+        "@northpolesec_santa_crate_index//:rednose",
+        # "@northpolesec_santa_crate_index//:export_bridge",
+        # "@rules_rust++crate+northpolesec_santa_crate_index__rednose-0.1.0//:export_bridge",
         "@northpolesec_santa_crate_index//:arrow",
     ] + all_crate_deps(normal = True),
 )

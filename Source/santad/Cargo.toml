@@ -25,3 +25,6 @@ path = "rust"
 [dependencies]
 arrow = "53.3.0"
 cxx = "1.0.160"
+# rednose = { git = "https://github.com/northpolesec/rednose.git", branch = "reorg", subdirectory = "crates/rednose" }
+rednose = { git = "https://github.com/northpolesec/rednose.git", branch = "reorg" }
+rednose_macro = { git = "https://github.com/northpolesec/rednose.git", branch = "reorg" }

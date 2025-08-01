@@ -46,13 +46,13 @@ git_override(
     remote = "https://github.com/northpolesec/protos",
 )
 
-# North Pole Rednose
-bazel_dep(name = "rednose", version = "1.0.0", repo_name = "northpolesec_rednose")
-git_override(
-    module_name = "rednose",
-    commit = "20358330121d997eee4ed2582f3741c3cccc2038",
-    remote = "https://github.com/northpolesec/rednose",
-)
+# # North Pole Rednose
+# bazel_dep(name = "rednose", version = "1.0.0", repo_name = "northpolesec_rednose")
+# git_override(
+#     module_name = "rednose",
+#     commit = "20358330121d997eee4ed2582f3741c3cccc2038",
+#     remote = "https://github.com/northpolesec/rednose",
+# )
 
 # cel-cpp
 bazel_dep(name = "cel-cpp", version = "0.12.0")

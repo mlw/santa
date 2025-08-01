@@ -12,11 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::traits::*;
+// use crate::traits::*;
 use arrow::{
     array::{ArrayBuilder, StructBuilder},
     datatypes::{Field, Schema, TimeUnit},
 };
+use rednose::telemetry::traits::*;
+// use rednose::traits::*;
 use rednose_macro::arrow_table;
 use std::{collections::HashMap, time::Duration};
 
