@@ -28,6 +28,7 @@
 #include "Source/common/TelemetryEventMap.h"
 #include "Source/santad/Logs/EndpointSecurity/Serializers/BasicString.h"
 #include "Source/santad/Logs/EndpointSecurity/Serializers/Empty.h"
+#include "Source/santad/Logs/EndpointSecurity/Serializers/Parquet.h"
 #include "Source/santad/Logs/EndpointSecurity/Serializers/Protobuf.h"
 #include "Source/santad/Logs/EndpointSecurity/Serializers/Serializer.h"
 #include "Source/santad/Logs/EndpointSecurity/Writers/File.h"
@@ -63,7 +64,7 @@ std::unique_ptr<Logger> Logger::Create(
     uint64_t spool_flush_timeout_ms, uint32_t telemetry_export_seconds) {
   std::shared_ptr<santa::Serializer> serializer;
   std::shared_ptr<santa::Writer> writer;
-
+  log_type = SNTEventLogTypeParquet;
   switch (log_type) {
     case SNTEventLogTypeFilelog:
       serializer = BasicString::Create(esapi, std::move(decision_cache));
@@ -76,6 +77,10 @@ std::unique_ptr<Logger> Logger::Create(
       break;
     case SNTEventLogTypeNull:
       serializer = Empty::Create();
+      writer = Null::Create();
+      break;
+    case SNTEventLogTypeParquet:
+      serializer = Parquet::Create(esapi, std::move(decision_cache), [spool_log_path UTF8String]);
       writer = Null::Create();
       break;
     case SNTEventLogTypeProtobuf:

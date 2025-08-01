@@ -3,6 +3,7 @@ load("@rules_apple//apple:macos.bzl", "macos_bundle")
 load("@rules_cc//cc:defs.bzl", "objc_library")
 load("@rules_rust//rust:defs.bzl", "rust_library")
 load("//:helper.bzl", "santa_unit_test")
+load("//:rust.bzl", "rust_cxx_bridge")
 
 package(
     default_visibility = [":__subpackages__"],
@@ -12,14 +13,25 @@ licenses(["notice"])
 
 rust_library(
     name = "santa_rust_lib",
-    srcs = glob(["rust/*.rs"]),
+    # srcs = glob(["rust/*.rs"]),
+    srcs = glob(["rust/*.rs", "rust/*/*.rs"]),
     edition = "2024",
     proc_macro_deps = [
-        "@northpolesec_rednose//rednose/lib/rednose_macro:rednose_macro",
+        # "@northpolesec_rednose//rednose/lib/rednose_macro:rednose_macro",
+        "@northpolesec_santa_crate_index//:rednose_macro",
     ] + all_crate_deps(proc_macro = True),
     deps = [
         "@northpolesec_santa_crate_index//:arrow",
     ] + all_crate_deps(normal = True),
+)
+
+rust_cxx_bridge(
+    name = "parquet_rs",
+    src = "rust/parquet_bridge.rs",
+    visibility = ["//visibility:public"],
+    deps = [
+        ":santa_rust_lib",
+    ],
 )
 
 objc_library(
@@ -745,6 +757,20 @@ objc_library(
 )
 
 objc_library(
+    name = "EndpointSecuritySerializerParquet",
+    srcs = ["Logs/EndpointSecurity/Serializers/Parquet.mm"],
+    hdrs = ["Logs/EndpointSecurity/Serializers/Parquet.h"],
+    deps = [
+        ":EndpointSecurityAPI",
+        ":EndpointSecuritySerializer",
+        ":SNTDecisionCache",
+        ":parquet_rs",
+        "//Source/common:Platform",
+        "//Source/common:SNTCachedDecision",
+    ],
+)
+
+objc_library(
     name = "EndpointSecurityWriter",
     hdrs = ["Logs/EndpointSecurity/Writers/Writer.h"],
     deps = [
@@ -808,6 +834,7 @@ objc_library(
         ":EndpointSecuritySerializer",
         ":EndpointSecuritySerializerBasicString",
         ":EndpointSecuritySerializerEmpty",
+        ":EndpointSecuritySerializerParquet",
         ":EndpointSecuritySerializerProtobuf",
         ":EndpointSecurityWriter",
         ":EndpointSecurityWriterFile",

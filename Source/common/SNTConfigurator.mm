@@ -14,6 +14,7 @@
 /// limitations under the License.
 
 #import "Source/common/SNTConfigurator.h"
+#include "Source/common/SNTCommonEnums.h"
 
 #include <sys/stat.h>
 
@@ -1080,6 +1081,8 @@ static SNTConfigurator *sharedConfigurator = nil;
   NSString *logType = [self.configState[kEventLogType] lowercaseString];
   if ([logType isEqualToString:@"protobuf"]) {
     return SNTEventLogTypeProtobuf;
+  } else if ([logType isEqualToString:@"protobuf"]) {
+    return SNTEventLogTypeParquet;
   } else if ([logType isEqualToString:@"syslog"]) {
     return SNTEventLogTypeSyslog;
   } else if ([logType isEqualToString:@"null"]) {

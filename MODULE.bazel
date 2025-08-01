@@ -2,6 +2,8 @@ module(name = "santa")
 
 bazel_dep(name = "abseil-cpp", version = "20250127.1")
 bazel_dep(name = "apple_support", version = "1.22.0")
+bazel_dep(name = "bazel_skylib", version = "1.8.1")
+bazel_dep(name = "cxx.rs", version = "1.0.158")
 bazel_dep(name = "googletest", version = "1.17.0")
 bazel_dep(name = "protobuf", version = "31.1")
 bazel_dep(name = "rules_apple", version = "3.21.0")
@@ -50,7 +52,8 @@ git_override(
 bazel_dep(name = "rednose", version = "1.0.0", repo_name = "northpolesec_rednose")
 git_override(
     module_name = "rednose",
-    commit = "20358330121d997eee4ed2582f3741c3cccc2038",
+    branch = "arrow-writer",
+    # commit = "20358330121d997eee4ed2582f3741c3cccc2038",
     remote = "https://github.com/northpolesec/rednose",
 )
 

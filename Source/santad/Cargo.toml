@@ -23,5 +23,9 @@ crate-type = ["lib"]
 path = "rust"
 
 [dependencies]
+anyhow = "1.0.95"
 arrow = "53.3.0"
+parquet = "53.3.0"
 cxx = "1.0.160"
+rednose = { git = "https://github.com/northpolesec/rednose", branch = "arrow-writer" }
+rednose_macro = { git = "https://github.com/northpolesec/rednose", branch = "arrow-writer" }

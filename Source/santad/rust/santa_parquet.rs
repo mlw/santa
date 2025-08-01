@@ -15,12 +15,29 @@
 use crate::traits::*;
 use arrow::{
     array::{ArrayBuilder, StructBuilder},
-    datatypes::{Field, Schema, TimeUnit},
+    datatypes::{Field, Schema},
 };
 use rednose_macro::arrow_table;
-use std::{collections::HashMap, time::Duration};
+use std::collections::HashMap;
 
 #[arrow_table]
-pub struct Common {
-    pub boot_uuid: String,
+pub struct Path {
+    /// A path to the file. Paths generally do not have canonical forms and
+    /// the same file may be found in multiple paths, any of which might be recorded.
+    pub path: String,
+    /// Whether the path is known to be incomplete, either because the buffer was too
+    /// small to contain it, or because components are missing (e.g. a partial dcache miss).
+    pub truncated: bool,
+}
+
+// #[arrow_table]
+// pub struct Common {
+//     pub boot_uuid: String,
+// }
+
+#[arrow_table]
+pub struct Exec {
+    // pub common: Common,
+    pub executable_path: Option<Path>,
+    pub pid: Option<i32>,
 }
